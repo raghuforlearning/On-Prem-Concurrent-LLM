@@ -1,0 +1,48 @@
+version: "3.8"
+
+# On-Prem Concurrent LLM - Ollama serving layer
+#
+# Usage:
+#   docker compose up -d
+#   docker exec -it ollama ollama pull qwen3:14b
+#   docker exec -it ollama ollama pull deepseek-r1:32b   # optional, reasoning tier
+#   docker exec -it ollama ollama pull gemma3:4b         # optional, utility tier
+#
+# Requires: nvidia-container-toolkit already installed and configured
+# (see infra/02-setup-gpu-docker.sh) and Docker Compose v2 (the
+# docker-compose-plugin package, not the standalone v1 docker-compose binary -
+# v1 does not support the `deploy.resources.reservations.devices` GPU syntax).
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    environment:
+      # Niren's spec: max initial concurrency 1. Raise this once real usage
+      # patterns justify it - see RUNBOOK.md Phase 7 backlog.
+      - OLLAMA_NUM_PARALLEL=1
+      # The A30's 24GB VRAM cannot hold all model tiers resident at once
+      # (14B Q4 ~8-9GB + 32B Q4 ~18-20GB alone exceeds it). Forcing this to 1
+      # gives predictable swap behavior instead of Ollama guessing.
+      - OLLAMA_MAX_LOADED_MODELS=1
+      # Default keep-alive is 5m. The FIRST inference after a model loads is
+      # always slow (CUDA JIT/warmup - see RUNBOOK.md benchmark notes), so a
+      # short keep-alive means intermittent traffic (proposal generation,
+      # occasional agent calls) keeps re-paying that cost. 30m is a starting
+      # point, not a tuned value - revisit once real traffic patterns are known.
+      - OLLAMA_KEEP_ALIVE=30m
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  ollama:

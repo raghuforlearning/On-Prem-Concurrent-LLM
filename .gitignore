@@ -1,0 +1,17 @@
+# Secrets
+.env
+*.token
+*token*.txt
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+
+# Logs
+*.log
+logs/
+
+# NeMo Guardrails local config overrides (once added) - keep the template,
+# ignore any environment-specific overrides
+guardrails/config.local.yml
