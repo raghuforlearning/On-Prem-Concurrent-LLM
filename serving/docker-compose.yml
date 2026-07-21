@@ -36,10 +36,15 @@ services:
       # Niren's spec: max initial concurrency 1. Raise this once real usage
       # patterns justify it - see RUNBOOK.md Phase 7 backlog.
       - OLLAMA_NUM_PARALLEL=1
-      # The A30's 24GB VRAM cannot hold all model tiers resident at once
-      # (14B Q4 ~8-9GB + 32B Q4 ~18-20GB alone exceeds it). Forcing this to 1
-      # gives predictable swap behavior instead of Ollama guessing.
-      - OLLAMA_MAX_LOADED_MODELS=1
+      # Raised 1 -> 2 (21 Jul 2026, Phase 3 follow-up): the A30's 24GB VRAM
+      # can't hold all THREE model tiers resident at once (14B Q4 ~8-9GB +
+      # 32B Q4 ~18-20GB alone exceeds it), but it CAN hold any one main tier
+      # alongside gemma3:4b (~3.3GB), which every guardrailed request also
+      # calls for self_check_input/output. At 1, every guardrailed request
+      # forced 2-3 sequential cold model swaps (self-check -> main ->
+      # self-check again) - confirmed slow in testing. At 2, gemma3:4b stays
+      # resident and only the main tier swaps.
+      - OLLAMA_MAX_LOADED_MODELS=2
       # Default keep-alive is 5m. The FIRST inference after a model loads is
       # always slow (CUDA JIT/warmup - see RUNBOOK.md benchmark notes), so a
       # short keep-alive means intermittent traffic (proposal generation,
@@ -73,9 +78,10 @@ services:
       # runtime (config.yml's parameters.base_url alone was not enough -
       # server errored "MAIN_MODEL_BASE_URL is not set" on first boot).
       # Named per model "type" in config.yml, uppercased + _BASE_URL.
-      - MAIN_MODEL_BASE_URL=http://ollama:11434
-      - SELF_CHECK_INPUT_MODEL_BASE_URL=http://ollama:11434
-      - SELF_CHECK_OUTPUT_MODEL_BASE_URL=http://ollama:11434
+      # Must be Ollama's OpenAI-compatible path (/v1) - bare root 404s.
+      - MAIN_MODEL_BASE_URL=http://ollama:11434/v1
+      - SELF_CHECK_INPUT_MODEL_BASE_URL=http://ollama:11434/v1
+      - SELF_CHECK_OUTPUT_MODEL_BASE_URL=http://ollama:11434/v1
     depends_on:
       - ollama
 
@@ -90,9 +96,9 @@ services:
     volumes:
       - ./guardrails/config_prod/default:/config/default:ro
     environment:
-      - MAIN_MODEL_BASE_URL=http://ollama:11434
-      - SELF_CHECK_INPUT_MODEL_BASE_URL=http://ollama:11434
-      - SELF_CHECK_OUTPUT_MODEL_BASE_URL=http://ollama:11434
+      - MAIN_MODEL_BASE_URL=http://ollama:11434/v1
+      - SELF_CHECK_INPUT_MODEL_BASE_URL=http://ollama:11434/v1
+      - SELF_CHECK_OUTPUT_MODEL_BASE_URL=http://ollama:11434/v1
     depends_on:
       - ollama
 
@@ -129,5 +135,13 @@ services:
       - guardrails-uat
 
 volumes:
+  # external: true - pins this to the literal volume named "ollama" rather
+  # than letting Compose create a project-prefixed one (e.g. serving_ollama).
+  # Needed because the ollama container/volume predates this compose project
+  # (started standalone originally) - without this, `docker rm -f ollama` +
+  # `compose up` silently attaches to a NEW empty volume instead of the one
+  # holding the actual pulled models (bit us 21 Jul 2026 during the
+  # MAX_LOADED_MODELS fix - models list came back empty after recreation).
   ollama:
+    external: true
   open-webui:
