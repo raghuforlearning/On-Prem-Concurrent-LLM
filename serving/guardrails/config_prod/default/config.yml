@@ -11,7 +11,7 @@ models:
     engine: ollama
     model: qwen3:14b
     parameters:
-      base_url: http://ollama:11434
+      base_url: http://ollama:11434/v1
     reasoning_config:
       remove_reasoning_traces: True
       start_token: "<think>"
@@ -21,13 +21,13 @@ models:
     engine: ollama
     model: gemma3:4b
     parameters:
-      base_url: http://ollama:11434
+      base_url: http://ollama:11434/v1
 
   - type: self_check_output
     engine: ollama
     model: gemma3:4b
     parameters:
-      base_url: http://ollama:11434
+      base_url: http://ollama:11434/v1
 
 rails:
   input:

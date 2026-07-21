@@ -14,6 +14,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 EXPOSE 8000
 
-# --config is set to /config, which docker-compose.yml mounts from
-# ./guardrails/config_uat or ./guardrails/config_prod depending on the service.
-CMD ["nemoguardrails", "server", "--config", "/config", "--port", "8000"]
+# --config points at a CONFIGS ROOT (a folder of named sub-folders, one per
+# config), not a config directly - docker-compose.yml mounts a "default"
+# sub-folder in from ./guardrails/config_uat/default or config_prod/default.
+# --default-config-id means clients don't need to know/send a config_id -
+# every request just falls through to the one config each container serves.
+CMD ["nemoguardrails", "server", "--config", "/config", "--port", "8000", "--default-config-id", "default"]
