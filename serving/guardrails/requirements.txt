@@ -1,0 +1,4 @@
+nemoguardrails>=0.13.0
+litellm
+uvicorn
+fastapi

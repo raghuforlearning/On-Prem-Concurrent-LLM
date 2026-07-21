@@ -1,0 +1,39 @@
+# UAT environment - AI Guardrail Policy v1.0, Section 8.
+# Reasoning traces (deepseek-r1's <think>...</think> content) are PASSED THROUGH
+# untouched here, so testers can see the model's reasoning - this is the
+# difference from config_prod, which strips it.
+#
+# Points at the shared Ollama backend (single A30 - see policy Section 8.1,
+# there is no separate model/GPU for UAT, only a separate guardrail config).
+
+models:
+  - type: main
+    engine: ollama
+    model: qwen3:14b
+    parameters:
+      base_url: http://ollama:11434
+    reasoning_config:
+      remove_reasoning_traces: False
+
+  # Deliberately using gemma3:4b (the small/fast tier) for both self-check
+  # rails rather than the main model - keeps the safety-check pass cheap and
+  # fast regardless of which main model answered the request.
+  - type: self_check_input
+    engine: ollama
+    model: gemma3:4b
+    parameters:
+      base_url: http://ollama:11434
+
+  - type: self_check_output
+    engine: ollama
+    model: gemma3:4b
+    parameters:
+      base_url: http://ollama:11434
+
+rails:
+  input:
+    flows:
+      - self check input
+  output:
+    flows:
+      - self check output

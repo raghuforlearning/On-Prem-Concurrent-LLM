@@ -1,0 +1,38 @@
+# Prod environment - AI Guardrail Policy v1.0, Section 8.
+# reasoning_config strips the model's <think>...</think> reasoning trace before
+# the response reaches the client - the only functional difference from
+# config_uat. DeepSeek and Nemotron-family models both use <think>/</think> as
+# their reasoning delimiters, which is what qwen3/deepseek-r1 produce.
+#
+# Same shared Ollama backend as UAT (single A30 - see policy Section 8.1).
+
+models:
+  - type: main
+    engine: ollama
+    model: qwen3:14b
+    parameters:
+      base_url: http://ollama:11434
+    reasoning_config:
+      remove_reasoning_traces: True
+      start_token: "<think>"
+      end_token: "</think>"
+
+  - type: self_check_input
+    engine: ollama
+    model: gemma3:4b
+    parameters:
+      base_url: http://ollama:11434
+
+  - type: self_check_output
+    engine: ollama
+    model: gemma3:4b
+    parameters:
+      base_url: http://ollama:11434
+
+rails:
+  input:
+    flows:
+      - self check input
+  output:
+    flows:
+      - self check output

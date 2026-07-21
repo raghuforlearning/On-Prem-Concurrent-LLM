@@ -1,6 +1,6 @@
 # Runbook — On-Prem Concurrent LLM
 
-Last updated: 19 Jul 2026
+Last updated: 21 Jul 2026
 
 ## 1. Purpose and background
 
@@ -110,15 +110,54 @@ Deployed via `serving/docker-compose.yml`. Key config, and why:
 - `num_ctx=8192` (Niren's spec) — plan is to set this per-request via API `options`, not bake it into the model, so each consumer (NL-Proposal-Builder, agents) can override if it ever needs a different context size. Not yet wired up — do this when building the Phase 5 integration.
 - Qwen3 runs in "thinking" mode by default (visible reasoning block before the final answer — adds tokens and latency). Likely want to suppress this for proposal generation specifically via API options. Revisit in Phase 5.
 
-## 5. Remaining phases (not yet built)
+## 5. Phase 4 — Open WebUI (demo access layer) — COMPLETE (19 Jul 2026)
 
-- **Phase 3 — Guardrails:** NVIDIA NeMo Guardrails in front of the Ollama API. Policy layer for content safety, prompt injection defense, topic boundaries appropriate to internal reasoning/document/code use.
-- **Phase 4 — Access layer:** Open WebUI pointed at the guardrailed endpoint, for staff chat access separate from the raw API.
-- **Phase 5 — NL-Proposal-Builder integration:** update `src/anthropic.js`'s multi-provider router to add a "local" provider hitting this endpoint, flip `AI_PROVIDER` in `.env`, test end to end, decide on a Groq/OpenAI fallback strategy.
-- **Phase 6 — Hand off to Niren:** give him the guardrailed endpoint for his agent framework. Confirm he understands the concurrency=1 shared-queue behavior — his agent traffic and proposal-generation traffic queue behind each other during this pilot, no priority lane yet.
+Deployed as a second service in `serving/docker-compose.yml` (`ghcr.io/open-webui/open-webui:main`, port 3000). Not opened to general staff yet — a demo for Niren. First account to sign up becomes admin. Response info (info icon on any reply) shows prompt/response tokens and tok/s natively, straight from the backend's generation stats.
+
+**Two gotchas hit during deployment:**
+1. Pushing code from the sandbox to GitHub does **not** put it on the VM — the VM had never actually cloned the repo. Always `git clone`/`git pull` on the VM itself after pushing.
+2. `docker compose up -d open-webui` tried to recreate the already-running standalone `ollama` container (name conflict) — Compose didn't recognize it as belonging to this project since it was started separately. Fixed with `docker compose up -d --no-deps open-webui`. Then found `ollama` and `open-webui` ended up on different Docker networks (`bridge` vs `serving_default`), so hostname resolution between them failed — fixed with `docker network connect serving_default ollama`.
+
+Demo verified end to end: qwen3:14b answered a "create a calculator" prompt correctly (visible ~8s thinking pass, working Python code), token-usage panel confirmed working.
+
+## 6. Phase 3 — Guardrails — COMPLETE (21 Jul 2026)
+
+Built against the approved **AI Guardrail Policy v1.0** (see `docs/` or the policy docx). Two NeMo Guardrails containers, both sharing the one Ollama/A30 backend — no second GPU needed:
+
+| Environment | Config | Port | Reasoning trace | Consumers |
+|---|---|---|---|---|
+| UAT | `guardrails/config_uat/` | 8001 | Visible | Open WebUI demo (repointed here from raw Ollama) |
+| Prod | `guardrails/config_prod/` | 8000 | Stripped | NL-Proposal-Builder / agents (Phase 5/6, not yet wired) |
+
+**What the rails do:** `self_check_input` and `self_check_output` (both running on `gemma3:4b` — kept small/fast so the safety pass doesn't add much latency regardless of which main model answered) implement policy Section 2's block categories (violence, hate speech, sexual content, self-harm, illegal activity, extremism) plus Section 3's prompt-injection defense, folded into the same input-check prompt. Prod vs UAT differ only in `reasoning_config.remove_reasoning_traces` in `config.yml` — NeMo Guardrails has native support for stripping `<think>...</think>` content, no custom code needed.
+
+**Known gap, not yet closed:** Section 2's "Flag + Log" tier (profanity/mild toxicity) isn't implemented — the current self-check rails are a binary block/allow gate. Flag+Log needs a separate non-blocking classification+logging step. Tracked as a Phase 3 follow-up once the block/allow gate is verified working end to end on real traffic.
+
+**Not yet built:** the Grafana + Loki audit-logging/RBAC layer proposed in policy Section 10 (180-day retention, Admin/Manager roles) — NeMo Guardrails' tracing can export to it via OpenTelemetry once it exists, but the log store itself hasn't been stood up.
+
+**Deploy commands** (run on the VM, from `~/On-Prem-Concurrent-LLM/serving`):
+```
+git pull
+docker compose build guardrails-uat guardrails-prod
+docker compose up -d guardrails-uat guardrails-prod
+docker compose up -d open-webui   # recreates with new OPENAI_API_BASE_URLS env var
+```
+
+**Verify:**
+```
+curl http://localhost:8001/v1/models        # UAT guardrails up
+curl http://localhost:8000/v1/models        # Prod guardrails up
+```
+Then test a benign prompt and a clearly-blockable prompt (e.g. asking for weapons instructions) against both `:8001/v1/chat/completions` and `:8000/v1/chat/completions` — the benign one should pass through, the bad one should be refused by the input rail. Compare a reasoning-model response (deepseek-r1 or qwen3 with thinking) between UAT and Prod to confirm the `<think>` block is visible on 8001 and stripped on 8000.
+
+## 7. Remaining phases (not yet built)
+
+- **Phase 3 follow-up:** Section 2 "Flag + Log" tier for profanity, and the Grafana+Loki audit-log/RBAC layer from policy Section 10.
+- **Phase 5 — NL-Proposal-Builder integration:** update `src/anthropic.js`'s multi-provider router to add a "local" provider hitting the guardrails-prod endpoint (`http://192.168.71.11:8000/v1`), flip `AI_PROVIDER` in `.env`, test end to end, decide on a Groq/OpenAI fallback strategy.
+- **Phase 6 — Hand off to Niren:** give him the guardrails-prod endpoint for his agent framework. Confirm he understands the concurrency=1 shared-queue behavior — his agent traffic and proposal-generation traffic queue behind each other during this pilot, no priority lane yet.
 - **Phase 7 — Backlog:** document-vision (VLM) and embedding/reranker model tiers, evaluate migrating from Ollama to vLLM once concurrency needs grow (the VM's isolated driver — CUDA 13.3 — makes this a low-risk swap later), consider a priority queue so proposal generation isn't starved by agent traffic, consider MIG partitioning on the A30 for hard workload isolation if needed.
 
-## 6. Troubleshooting quick reference
+## 8. Troubleshooting quick reference
 
 | Symptom | Cause | Fix |
 |---|---|---|
@@ -128,8 +167,11 @@ Deployed via `serving/docker-compose.yml`. Key config, and why:
 | First LLM request after container start is very slow (30-40s, <1 tok/s prompt eval) | One-time CUDA JIT/warmup cost | Not a bug — benchmark the second request instead |
 | PowerShell multi-line paste produces garbled/merged commands | RDP clipboard paste can drop characters (e.g. a closing quote), causing PowerShell's `>>` continuation prompt to merge two separate commands into one | Paste commands one at a time rather than as a block; if you see `>>` unexpectedly, `Ctrl+C` and retry that command alone |
 
-## 7. Credentials and access
+## 9. Credentials and access
 
 - VM SSH: `ssh <username>@192.168.71.11` (LAN) — see whoever provisioned the VM for the account; not stored in this repo
-- Ollama API (internal only, not guardrailed yet): `http://192.168.71.11:11434`
+- Ollama API (internal only, direct/unguardrailed — for troubleshooting, not normal use now that Phase 3 is live): `http://192.168.71.11:11434`
+- Guardrails UAT (guardrailed, reasoning visible): `http://192.168.71.11:8001/v1`
+- Guardrails Prod (guardrailed, reasoning stripped): `http://192.168.71.11:8000/v1`
+- Open WebUI demo: `http://192.168.71.11:3000`
 - Host PowerShell/RDP: `192.168.71.2` — standard NLABDLAS01 admin credentials, not stored in this repo

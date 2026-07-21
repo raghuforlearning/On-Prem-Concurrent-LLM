@@ -8,6 +8,16 @@ version: "3.8"
 #   docker exec -it ollama ollama pull deepseek-r1:32b   # optional, reasoning tier
 #   docker exec -it ollama ollama pull gemma3:4b         # optional, utility tier
 #
+# Open WebUI (demo chat UI for Niren, Phase 4): http://<VM-IP>:3000
+# First person to sign up becomes admin. Response info (click the info icon
+# on any reply) shows prompt tokens, response tokens, and tokens/sec straight
+# from Ollama's generation stats - no extra config needed for that.
+#
+# Guardrails (Phase 3, AI Guardrail Policy v1.0):
+#   UAT  - http://<VM-IP>:8001/v1  (reasoning trace visible, used by Open WebUI above)
+#   Prod - http://<VM-IP>:8000/v1  (reasoning trace stripped - for NL-Proposal-Builder/agents, Phase 5/6)
+#   docker compose build guardrails-uat guardrails-prod   # first time / after config change
+#
 # Requires: nvidia-container-toolkit already installed and configured
 # (see infra/02-setup-gpu-docker.sh) and Docker Compose v2 (the
 # docker-compose-plugin package, not the standalone v1 docker-compose binary -
@@ -44,5 +54,68 @@ services:
               count: all
               capabilities: [gpu]
 
+  # Phase 3 - AI Guardrail Policy v1.0. Two environments sharing the one
+  # Ollama/A30 backend (policy Section 8.1) - config differs only in whether
+  # deepseek/qwen's <think> reasoning trace is stripped. See guardrails/
+  # config_uat/config.yml and config_prod/config.yml.
+  guardrails-uat:
+    build:
+      context: ./guardrails
+      dockerfile: Dockerfile
+    container_name: guardrails-uat
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./guardrails/config_uat:/config:ro
+    depends_on:
+      - ollama
+
+  guardrails-prod:
+    build:
+      context: ./guardrails
+      dockerfile: Dockerfile
+    container_name: guardrails-prod
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./guardrails/config_prod:/config:ro
+    depends_on:
+      - ollama
+
+  # Phase 4 demo UI for Niren, now repointed through guardrails-uat instead of
+  # straight at Ollama (Phase 3 is live - guardrails are mandatory per policy
+  # Section 3, not optional per-app). Reasoning trace stays visible here
+  # because it's the UAT config - see policy Section 8.
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    restart: unless-stopped
+    ports:
+      - "3000:8080"
+    environment:
+      # No longer talking to Ollama directly - OPENAI_API_BASE_URL points at
+      # guardrails-uat's OpenAI-compatible endpoint instead, so every demo
+      # request goes through the self-check input/output rails.
+      - ENABLE_OPENAI_API=true
+      - OPENAI_API_BASE_URLS=http://guardrails-uat:8000/v1
+      - OPENAI_API_KEYS=not-checked-internal-only
+      # Kept as a fallback connection for direct troubleshooting only - not
+      # meant to be selected for normal demo use now that guardrails are live.
+      - OLLAMA_BASE_URL=http://ollama:11434
+      # Turns off telemetry/update pings to an external server - internal
+      # deployment, no need for it to phone home.
+      - WEBUI_AUTH=true
+      - SCARF_NO_ANALYTICS=true
+      - DO_NOT_TRACK=true
+      - ANONYMIZED_TELEMETRY=false
+    volumes:
+      - open-webui:/app/backend/data
+    depends_on:
+      - ollama
+      - guardrails-uat
+
 volumes:
   ollama:
+  open-webui:
