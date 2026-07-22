@@ -5,6 +5,13 @@
 #
 # Points at the shared Ollama backend (single A30 - see policy Section 8.1,
 # there is no separate model/GPU for UAT, only a separate guardrail config).
+#
+# rails.input/output.flows reference "... with audit" flows (audit_flows.co)
+# instead of the library's built-in "self check input"/"self check output" -
+# these are a byte-identical copy of the built-in v1.0 flows plus one added
+# structured-logging line each (AI Guardrail Policy v1.1 Section 10.1, Layer
+# 2 - see RUNBOOK.md Section 6.5/6.6, verified 22-Jul-2026). The block/allow
+# decision itself is unchanged; only logging was added.
 
 models:
   - type: main
@@ -33,7 +40,7 @@ models:
 rails:
   input:
     flows:
-      - self check input
+      - self check input with audit
   output:
     flows:
-      - self check output
+      - self check output with audit

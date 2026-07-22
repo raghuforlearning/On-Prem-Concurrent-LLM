@@ -1,0 +1,45 @@
+# AI Guardrail Policy v1.1 Section 10.1 - Layer 2 structured audit logging
+# (UAT rollout, 22-Jul-2026).
+#
+# These two flows are BYTE-IDENTICAL to NeMo Guardrails' own bundled v1.0
+# self_check_input/output flows, verified 22-Jul-2026 by reading the actual
+# source running inside the guardrails-uat container:
+#   /usr/local/lib/python3.11/site-packages/nemoguardrails/library/self_check/
+#     input_check/flows.v1.co
+#     output_check/flows.v1.co
+# ...plus exactly ONE added line each: `execute audit_log_input(...)` /
+# `execute audit_log_output(...)` (see actions.py), inserted BEFORE the
+# `if not $allowed` block so logging always fires for both outcomes
+# (allowed and blocked) - never conditional on the block decision.
+#
+# Given a NEW flow name ("... with audit") rather than overriding the
+# built-in "self check input" / "self check output" names, so there is zero
+# ambiguity about which implementation wins at load time - the actual
+# block/allow logic is untouched, just extended. config.yml's
+# rails.input.flows / rails.output.flows reference these new names instead
+# of the built-in ones.
+#
+# Deliberately does NOT redefine `bot refuse to respond` here - it's already
+# defined by the library flows this config also loads (self_check_input/
+# output are still the underlying actions being called); redefining it again
+# risked a duplicate-definition conflict for zero benefit.
+
+define flow self check input with audit
+  $allowed = execute self_check_input
+  execute audit_log_input(allowed=$allowed)
+  if not $allowed
+    if $config.enable_rails_exceptions
+      create event InputRailException(message="Input not allowed. The input was blocked by the 'self check input' flow.")
+    else
+      bot refuse to respond
+    stop
+
+define flow self check output with audit
+  $allowed = execute self_check_output
+  execute audit_log_output(allowed=$allowed)
+  if not $allowed
+    if $config.enable_rails_exceptions
+      create event OutputRailException(message="Output not allowed. The output was blocked by the 'self check output' flow.")
+    else
+      bot refuse to respond
+    stop

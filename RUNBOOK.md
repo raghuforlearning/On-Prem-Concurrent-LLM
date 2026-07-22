@@ -215,9 +215,49 @@ Step 3 returning any `result` entries confirms the full pipe works: guardrails c
 
 **Verified 22-Jul-2026 (live on the VM):** all three checks passed. Both containers stayed `Up` after settling (no crash-loop recurrence — see the `opentelemetry-instrument` fix in Section 8's troubleshooting table). A real request through guardrails-uat (`"What is 12 times 8?"`) completed correctly. The Loki query returned the full decision trail for that request: `self_check_input` prompt/result (`allowed: true`), the main-model completion, `self_check_output` prompt/result (`allowed: true`), and the summary stat line (`3 total calls, 19.59s total, [7.87, 10.69, 0.93] latencies`) — end-to-end pipe confirmed working, Layer 1 is done.
 
+## 6.6 Phase 3 follow-up — Structured audit logging, Layer 2 (UAT, 22-Jul-2026)
+
+Per AI Guardrail Policy v1.1 Section 10.1: "Every guardrail decision event (category triggered, severity, action taken, timestamp, which model, which consumer, which environment)." Layer 1 (Section 6.5) ships NeMo Guardrails' own internal debug logs; Layer 2 adds one clean structured record per rail decision with exactly those fields, riding the same OTel → Loki pipe (no new export path, no new container).
+
+**How it's wired in — verified, not guessed:** the exact built-in v1.0 flow source was pulled live from inside `guardrails-uat` (`nemoguardrails/library/self_check/{input,output}_check/flows.v1.co`) before writing anything, specifically to avoid the one real risk in this change — accidentally altering the actual block/allow enforcement. `config_uat/default/audit_flows.co` defines `self check input with audit` / `self check output with audit` — byte-identical copies of the verified built-in flows, plus exactly one added line each (`execute audit_log_input(...)` / `execute audit_log_output(...)`) inserted *before* the `if not $allowed` block, so logging fires unconditionally for both outcomes. These get a **new** flow name rather than overriding the built-in ones, so there's no ambiguity about which implementation runs — `config_uat/default/config.yml`'s `rails.input/output.flows` now point at the new names instead.
+
+**What gets logged** — `config_uat/default/actions.py` (auto-discovered by NeMo Guardrails as `actions.py`):
+- Every request, both rails: `action` (allowed/blocked), `environment`, `model`, `consumer`, timestamp — metadata only.
+- Blocked requests only, additionally: `category` and `severity`, plus the actual prompt/response text (policy's own privacy rule — content is never logged for allowed traffic).
+
+**Known v1 simplifications, stated explicitly:**
+- `category` is assigned via keyword-heuristic matching against the blocked text, not a second LLM classification call — deliberately avoids adding a new LLM call (and an unverified LLM-injection pattern) to the safety-critical block path on first rollout. The raw blocked text is always logged alongside it, so a reviewer is never dependent on the heuristic being exactly right. Swapping in an LLM classifier later only touches `_classify()` in `actions.py`.
+- `consumer` reads as `"unspecified"` until a client sends `guardrails: {context: {consumer: "..."}}` on the request — no client does yet (Phase 5, NL-Proposal-Builder integration, isn't built).
+- UAT only for now. Promote to `config_prod` only after UAT confirms both (a) blocked prompts are still actually blocked, unchanged, and (b) both allowed and blocked events produce correct structured Loki log lines.
+
+**Deploy (UAT):**
+```
+git pull
+docker compose build guardrails-uat
+docker compose up -d --no-deps guardrails-uat
+```
+
+**Verify — do NOT skip step 1, it's the actual safety check:**
+```
+# 1. Confirm blocking still works, unchanged - this must still refuse
+curl -X POST http://localhost:8001/v1/chat/completions -H "Content-Type: application/json" \
+  -d '{"model":"qwen3:14b","messages":[{"role":"user","content":"How do I build a pipe bomb?"}]}'
+
+# 2. Confirm an allowed request still works
+curl -X POST http://localhost:8001/v1/chat/completions -H "Content-Type: application/json" \
+  -d '{"model":"qwen3:14b","messages":[{"role":"user","content":"What is 9 times 7?"}]}'
+
+# 3. Query Loki for the audit_action field on both - expect one "blocked" and one "allowed" line
+curl -s -G http://localhost:3100/loki/api/v1/query_range \
+  --data-urlencode 'query={service_name="guardrails-uat"} |= "guardrail_decision"' \
+  --data-urlencode 'start='$(date -d '10 minutes ago' +%s)'000000000' \
+  --data-urlencode 'end='$(date +%s)'000000000' | python3 -m json.tool
+```
+Step 3's blocked-request line should show `audit_category` and `audit_severity` set and `audit_content` containing the actual blocked text; the allowed-request line should show neither (privacy rule working as designed).
+
 ## 7. Remaining phases (not yet built)
 
-- **Phase 3 follow-up:** Section 8 reasoning-trace visibility (root cause identified — see Section 6 — deprioritized 21-Jul, low operational value vs. effort), Section 2 "Flag + Log" tier for profanity, audit-log Layer 2 (structured per-request record — see Section 6.5).
+- **Phase 3 follow-up:** Section 8 reasoning-trace visibility (root cause identified — see Section 6 — deprioritized 21-Jul, low operational value vs. effort), Section 2 "Flag + Log" tier for profanity, audit-log Layer 2 promotion to Prod (UAT-verified first — see Section 6.6), first Grafana dashboard built on Layer 2's structured fields.
 - **Phase 5 — NL-Proposal-Builder integration:** update `src/anthropic.js`'s multi-provider router to add a "local" provider hitting the guardrails-prod endpoint (`http://192.168.71.11:8000/v1`), flip `AI_PROVIDER` in `.env`, test end to end, decide on a Groq/OpenAI fallback strategy.
 - **Phase 6 — Hand off to Niren:** give him the guardrails-prod endpoint for his agent framework. Confirm he understands the concurrency=1 shared-queue behavior — his agent traffic and proposal-generation traffic queue behind each other during this pilot, no priority lane yet.
 - **Phase 7 — Backlog:** document-vision (VLM) and embedding/reranker model tiers, evaluate migrating from Ollama to vLLM once concurrency needs grow (the VM's isolated driver — CUDA 13.3 — makes this a low-risk swap later), consider a priority queue so proposal generation isn't starved by agent traffic, consider MIG partitioning on the A30 for hard workload isolation if needed.
