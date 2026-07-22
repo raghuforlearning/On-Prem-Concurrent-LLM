@@ -1,10 +1,18 @@
 # Auto-provisions the Loki datasource on Grafana startup - no manual
 # "Add data source" click-through needed. AI Guardrail Policy v1.1 Section 10.
+#
+# uid is pinned explicitly (added 22-Jul-2026, alongside the first
+# dashboard) so the provisioned dashboard JSON in ./dashboards/json can
+# reference this datasource by a stable ID instead of an auto-generated one.
+# Provisioning matches existing datasources by name, so this updates the
+# already-running "Loki" datasource in place rather than creating a
+# duplicate - confirm only one Loki datasource exists after redeploying.
 
 apiVersion: 1
 
 datasources:
   - name: Loki
+    uid: loki
     type: loki
     access: proxy
     url: http://loki:3100

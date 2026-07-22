@@ -261,9 +261,31 @@ Step 3's blocked-request line should show `audit_category` and `audit_severity` 
 
 **Verified 22-Jul-2026 (live on the VM, after the race-condition fix above):** all three checks passed. Blocking unchanged — `"How do I build a pipe bomb?"` still correctly refused. Loki returned exactly the right three lines: `rail=input action=blocked category=weapons_drugs_cbrn severity=critical` with `audit_content` containing the actual blocked text; `rail=input action=allowed` and `rail=output action=allowed` for the follow-up math question, both with no category/severity/content fields present — privacy rule confirmed working as designed. Layer 2 is done for UAT. Output rail's blocked path specifically (as opposed to input's) has not yet been tested against a real blocked *response* — flagged as a follow-up before Prod promotion, not assumed safe by symmetry alone.
 
+## 6.7 First Grafana dashboard — "AI Guardrails - Audit Overview" (22-Jul-2026)
+
+Built on top of Layer 2's structured `audit_*` fields (Section 6.6). Auto-provisioned — no manual import needed, same pattern as the Loki datasource.
+
+**Files:**
+- `grafana/provisioning/datasources/loki.yaml` — Loki datasource now has a pinned `uid: loki` (added alongside this dashboard) so panel JSON can reference it by a stable ID. Provisioning matches existing datasources by name, so this updates the already-running datasource in place — **verify only one Loki datasource shows up after redeploying**, not two.
+- `grafana/provisioning/dashboards/dashboards.yaml` — tells Grafana to auto-load dashboard JSON from `./json`.
+- `grafana/provisioning/dashboards/json/guardrails-audit.json` — the dashboard itself, folder "Guardrails", 8 panels: Total Requests, Blocked Requests, Fully Allowed Requests, Requests by Environment (stat/pie panels), Requests Over Time by outcome (stacked bar), Blocked by Category, Blocked by Severity (bar charts), and Recent Blocked Events (a Logs panel — this is where the actual blocked prompt/response text is visible, per the policy's own privacy rule).
+
+**Counting logic, stated explicitly so the numbers aren't misread:** "Total Requests" counts the input-rail decision line only (fires exactly once per request). "Blocked Requests" counts `audit_action="blocked"` across both rails (fires exactly once per blocked request, on whichever rail caught it — a request never gets blocked twice). "Fully Allowed Requests" counts `audit_rail="output", audit_action="allowed"` specifically, since a request only reaches and clears the output rail after already clearing input. Don't sum "allowed" across both rails for a request count — that double-counts every fully-allowed request.
+
+**Known v1 limitation:** category breakdown reflects the keyword-heuristic classifier in `actions.py`, not an LLM judgment — treat it as a rough grouping, not a precise label. The Recent Blocked Events panel always has the real text, so nothing is hidden behind the category label.
+
+**Deploy:**
+```
+git pull
+docker compose up -d --no-deps grafana
+```
+(Loki/guardrails containers untouched — this only touches Grafana's provisioning.)
+
+**Verify:** open `http://<VM-IP>:3001`, confirm the "Guardrails" folder shows "AI Guardrails - Audit Overview" with all 8 panels rendering (not showing "N/A" or query errors), confirm Configuration > Data sources still shows exactly one Loki entry, and confirm the Blocked Requests panel and Recent Blocked Events panel both reflect the test blocks already run in Section 6.6.
+
 ## 7. Remaining phases (not yet built)
 
-- **Phase 3 follow-up:** Section 8 reasoning-trace visibility (root cause identified — see Section 6 — deprioritized 21-Jul, low operational value vs. effort), Section 2 "Flag + Log" tier for profanity, audit-log Layer 2 promotion to Prod (UAT-verified — see Section 6.6 — output-rail block path still to be tested first), first Grafana dashboard built on Layer 2's structured fields.
+- **Phase 3 follow-up:** Section 8 reasoning-trace visibility (root cause identified — see Section 6 — deprioritized 21-Jul, low operational value vs. effort), Section 2 "Flag + Log" tier for profanity, audit-log Layer 2 promotion to Prod (UAT-verified — see Section 6.6 — output-rail block path still to be tested first).
 - **Phase 5 — NL-Proposal-Builder integration:** update `src/anthropic.js`'s multi-provider router to add a "local" provider hitting the guardrails-prod endpoint (`http://192.168.71.11:8000/v1`), flip `AI_PROVIDER` in `.env`, test end to end, decide on a Groq/OpenAI fallback strategy.
 - **Phase 6 — Hand off to Niren:** give him the guardrails-prod endpoint for his agent framework. Confirm he understands the concurrency=1 shared-queue behavior — his agent traffic and proposal-generation traffic queue behind each other during this pilot, no priority lane yet.
 - **Phase 7 — Backlog:** document-vision (VLM) and embedding/reranker model tiers, evaluate migrating from Ollama to vLLM once concurrency needs grow (the VM's isolated driver — CUDA 13.3 — makes this a low-risk swap later), consider a priority queue so proposal generation isn't starved by agent traffic, consider MIG partitioning on the A30 for hard workload isolation if needed.

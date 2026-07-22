@@ -1,0 +1,189 @@
+{
+  "uid": "guardrails-audit-v1",
+  "title": "AI Guardrails - Audit Overview",
+  "description": "AI Guardrail Policy v1.1 Section 10 audit dashboard, built on Layer 2 structured decision records (actions.py in each guardrails config). Total requests are counted once per request via the input rail line; blocked requests are counted once per request regardless of which rail caught them; allowed requests are counted via the output rail line, since a request only reaches and passes output after clearing input. Content for blocked events is visible in the 'Recent Blocked Events' panel per Policy Section 10.1's privacy rule - allowed traffic never logs content.",
+  "tags": ["nationlabs", "guardrails", "audit"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-24h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Total Requests",
+      "description": "Counted once per request via the input rail's decision line.",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(count_over_time({service_name=~\"guardrails-.*\", audit_rail=\"input\"}[$__range]))",
+          "queryType": "instant",
+          "datasource": { "type": "loki", "uid": "loki" }
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Blocked Requests",
+      "description": "Counted once per request, on whichever rail (input or output) caught it.",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(count_over_time({service_name=~\"guardrails-.*\", audit_action=\"blocked\"}[$__range]))",
+          "queryType": "instant",
+          "datasource": { "type": "loki", "uid": "loki" }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "fixed", "fixedColor": "red" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Fully Allowed Requests",
+      "description": "Reached and passed the output rail - i.e. cleared both checks.",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(count_over_time({service_name=~\"guardrails-.*\", audit_rail=\"output\", audit_action=\"allowed\"}[$__range]))",
+          "queryType": "instant",
+          "datasource": { "type": "loki", "uid": "loki" }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "fixed", "fixedColor": "green" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 4,
+      "type": "piechart",
+      "title": "Requests by Environment",
+      "description": "UAT vs Prod split (Prod will only populate once Layer 2 is promoted there).",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (audit_environment) (count_over_time({service_name=~\"guardrails-.*\", audit_rail=\"input\"}[$__range]))",
+          "queryType": "instant",
+          "datasource": { "type": "loki", "uid": "loki" }
+        }
+      ],
+      "options": { "legend": { "displayMode": "table", "placement": "right", "values": ["value"] } }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Requests Over Time (allowed vs blocked)",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 4 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (audit_action) (count_over_time({service_name=~\"guardrails-.*\", audit_rail=\"input\"}[$__interval]))",
+          "legendFormat": "input rail - {{audit_action}}",
+          "datasource": { "type": "loki", "uid": "loki" }
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (audit_action) (count_over_time({service_name=~\"guardrails-.*\", audit_rail=\"output\"}[$__interval]))",
+          "legendFormat": "output rail - {{audit_action}}",
+          "datasource": { "type": "loki", "uid": "loki" }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 60, "stacking": { "mode": "normal" } } },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 6,
+      "type": "barchart",
+      "title": "Blocked Requests by Category",
+      "description": "v1 categorization is keyword-heuristic, not LLM-classified - see actions.py. The actual blocked text is always available in the Recent Blocked Events panel below.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (audit_category) (count_over_time({service_name=~\"guardrails-.*\", audit_action=\"blocked\"}[$__range]))",
+          "queryType": "instant",
+          "datasource": { "type": "loki", "uid": "loki" }
+        }
+      ],
+      "options": { "orientation": "horizontal", "legend": { "displayMode": "none" } }
+    },
+    {
+      "id": 7,
+      "type": "barchart",
+      "title": "Blocked Requests by Severity",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (audit_severity) (count_over_time({service_name=~\"guardrails-.*\", audit_action=\"blocked\"}[$__range]))",
+          "queryType": "instant",
+          "datasource": { "type": "loki", "uid": "loki" }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "critical" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "dark-red" } }] },
+          { "matcher": { "id": "byName", "options": "high" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }] },
+          { "matcher": { "id": "byName", "options": "medium" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } }] }
+        ]
+      },
+      "options": { "orientation": "horizontal", "legend": { "displayMode": "none" } }
+    },
+    {
+      "id": 8,
+      "type": "logs",
+      "title": "Recent Blocked Events",
+      "description": "Raw blocked-decision log lines, both rails, both environments. Content is visible here per Policy Section 10.1 - blocked/flagged events are the only case where prompt/response text is captured.",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 20 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{service_name=~\"guardrails-.*\", audit_action=\"blocked\"}",
+          "datasource": { "type": "loki", "uid": "loki" }
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending"
+      }
+    }
+  ]
+}

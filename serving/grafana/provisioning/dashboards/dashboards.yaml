@@ -1,0 +1,22 @@
+# Auto-provisions dashboard JSON files from ./json on Grafana startup - no
+# manual import needed. AI Guardrail Policy v1.1 Section 10, first dashboard
+# added 22-Jul-2026 on top of the Layer 2 structured audit fields.
+#
+# allowUiUpdates: true - Raghu/Niren can tweak panels in the Grafana UI
+# without it fighting the provisioner; updateIntervalSeconds: 30 means a
+# `git pull` + new JSON file here shows up in Grafana within 30s, no
+# container restart needed (docker-compose.yml already mounts the whole
+# provisioning/ tree read-only).
+
+apiVersion: 1
+
+providers:
+  - name: 'NationLabs Guardrails'
+    orgId: 1
+    folder: 'Guardrails'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/json
