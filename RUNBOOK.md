@@ -176,9 +176,46 @@ curl -X POST http://localhost:8001/v1/chat/completions -H "Content-Type: applica
 ```
 First should answer normally; second should return `"I'm sorry, I can't respond to that."` Repeat against port 8000 (Prod) to confirm both environments enforce the same content-safety rules.
 
+## 6.5 Phase 3 follow-up — Audit logging (Grafana + Loki), Layer 1 (21-Jul-2026)
+
+Per AI Guardrail Policy v1.1 Section 10. Two new containers, both resource-capped (`deploy.resources.limits`, 0.5 CPU / 512MB each) because this VM's CPU/RAM/VRAM is a fixed, shared budget — see project memory on the "digital employees" roadmap (Proposal Builder now, AI Accounting/HR later, all on the same hardware until Niren scales it). Logging infrastructure must never be able to degrade the GPU-facing service.
+
+**Architecture — deliberately minimal:**
+- **Loki** (`grafana/loki:3.3.2`, port 3100) — log storage, 180-day retention (`retention_period: 4320h` in `loki-config.yaml`), filesystem backend. Uses Loki 3.0+'s **native OTLP log ingestion** (`/otlp/v1/logs`) — no separate OpenTelemetry Collector container. One fewer moving part, one fewer thing competing for resources.
+- **Grafana** (`grafana-oss:11.4.0`, host port 3001 — 3000 is already `open-webui`) — Loki datasource auto-provisioned via `grafana/provisioning/datasources/loki.yaml`. Admin account (Raghu, per policy v1.1 §10.4) via env vars — **placeholder password, must be changed on first login.** Niren's Editor account (maps to policy's "Manager" role) is **not yet created** — provision via Server Admin > Users > New user after first login. This matches the policy's own "reassignable via admin panel" language, not an oversight.
+- **guardrails-uat / guardrails-prod** — both containers now run `opentelemetry-instrument` (wraps the server process, Dockerfile CMD) with `OTEL_LOGS_EXPORTER=otlp` pointed directly at Loki's OTLP endpoint. `OTEL_TRACES_EXPORTER=none` / `OTEL_METRICS_EXPORTER=none` — explicitly disabled, not just unset, since distributed tracing (spans, Tempo) was a deliberate scope decision to defer, not something to half-build.
+
+**Scope decision, stated explicitly:** this ships NeMo Guardrails' *existing* operational logs (rail activations, block/allow decisions, LLM call info — logged internally at INFO level regardless) to Loki via Python's stdlib `logging` module, auto-instrumented. It does **not** yet emit one clean structured JSON record per request with exactly the fields policy §10.1 lists (category, severity, action, model, consumer, environment) — that's Layer 2, a small custom action, intentionally staged *after* confirming this transport actually works end-to-end. Don't mistake "logs are flowing" for "the structured audit record from §10.1 exists" — verify which one you're looking at in Grafana.
+
+**Deploy commands** (run on the VM, from `~/On-Prem-Concurrent-LLM/serving`):
+```
+git pull
+docker compose build guardrails-uat guardrails-prod
+docker compose up -d loki grafana
+docker compose up -d --no-deps guardrails-uat guardrails-prod
+```
+
+**Verify (known-good test sequence):**
+```
+# 1. Confirm both new containers are healthy and within their resource caps
+docker ps --filter name=loki --filter name=grafana
+docker stats --no-stream loki grafana
+
+# 2. Generate a real log-worthy event
+curl -X POST http://localhost:8001/v1/chat/completions -H "Content-Type: application/json" \
+  -d '{"model":"qwen3:14b","messages":[{"role":"user","content":"What is 12 times 8?"}]}'
+
+# 3. Query Loki directly for that log line (bypasses Grafana UI for a fast pass/fail)
+curl -s -G http://localhost:3100/loki/api/v1/query_range \
+  --data-urlencode 'query={service_name="guardrails-uat"}' \
+  --data-urlencode 'start='$(date -d '5 minutes ago' +%s)'000000000' \
+  --data-urlencode 'end='$(date +%s)'000000000' | python3 -m json.tool
+```
+Step 3 returning any `result` entries confirms the full pipe works: guardrails container → OTel auto-instrumentation → Loki's native OTLP endpoint → queryable. Then confirm visually in Grafana (`http://<VM-IP>:3001`, Explore > Loki > `{service_name="guardrails-uat"}`).
+
 ## 7. Remaining phases (not yet built)
 
-- **Phase 3 follow-up:** Section 8 reasoning-trace visibility (root cause identified, fix not yet built — see Section 6), Section 2 "Flag + Log" tier for profanity, the Grafana+Loki audit-log/RBAC layer from policy Section 10, and evaluate raising `OLLAMA_MAX_LOADED_MODELS` to 2.
+- **Phase 3 follow-up:** Section 8 reasoning-trace visibility (root cause identified — see Section 6 — deprioritized 21-Jul, low operational value vs. effort), Section 2 "Flag + Log" tier for profanity, audit-log Layer 2 (structured per-request record — see Section 6.5).
 - **Phase 5 — NL-Proposal-Builder integration:** update `src/anthropic.js`'s multi-provider router to add a "local" provider hitting the guardrails-prod endpoint (`http://192.168.71.11:8000/v1`), flip `AI_PROVIDER` in `.env`, test end to end, decide on a Groq/OpenAI fallback strategy.
 - **Phase 6 — Hand off to Niren:** give him the guardrails-prod endpoint for his agent framework. Confirm he understands the concurrency=1 shared-queue behavior — his agent traffic and proposal-generation traffic queue behind each other during this pilot, no priority lane yet.
 - **Phase 7 — Backlog:** document-vision (VLM) and embedding/reranker model tiers, evaluate migrating from Ollama to vLLM once concurrency needs grow (the VM's isolated driver — CUDA 13.3 — makes this a low-risk swap later), consider a priority queue so proposal generation isn't starved by agent traffic, consider MIG partitioning on the A30 for hard workload isolation if needed.

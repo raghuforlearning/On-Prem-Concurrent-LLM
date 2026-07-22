@@ -2,3 +2,9 @@ nemoguardrails>=0.13.0
 litellm
 uvicorn
 fastapi
+
+# Phase 3 follow-up (21-Jul-2026): audit logging - ship guardrail decision
+# logs to Loki via OpenTelemetry's Python auto-instrumentation. See
+# docker-compose.yml OTEL_* env vars and Dockerfile CMD for the wiring.
+opentelemetry-distro[otlp]
+opentelemetry-exporter-otlp-proto-http
