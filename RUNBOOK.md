@@ -295,6 +295,8 @@ curl -s -G http://localhost:3100/loki/api/v1/query_range \
 ```
 Expect `audit_environment: "prod"` on these lines, distinguishing them from UAT's in the shared Grafana dashboard.
 
+**Verified 22-Jul-2026 (live on the VM, same day as promotion):** all four checks passed. Blocking unchanged — pipe-bomb prompt correctly refused. Allowed math question answered correctly. Loki confirmed three correct lines, all tagged `audit_environment: "prod"`: `rail=input action=blocked category=weapons_drugs_cbrn severity=critical` with content captured, plus `rail=input action=allowed` and `rail=output action=allowed` for the follow-up. Layer 2 is now live in both UAT and Prod.
+
 ## 6.7 First Grafana dashboard — "AI Guardrails - Audit Overview" (22-Jul-2026)
 
 Built on top of Layer 2's structured `audit_*` fields (Section 6.6). Auto-provisioned — no manual import needed, same pattern as the Loki datasource.
