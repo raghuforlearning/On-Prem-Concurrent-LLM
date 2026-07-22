@@ -205,16 +205,17 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - grafana-data:/var/lib/grafana
     environment:
-      # Admin = Raghu per AI Guardrail Policy v1.1 Section 10.4.
-      # CHANGE THIS PASSWORD on first login - placeholder only, not a secret
-      # worth protecting since it's about to be replaced.
+      # Admin = Raghu per AI Guardrail Policy v1.1 Section 10.4. This
+      # bootstrap password was changed via the Grafana UI on first login
+      # (22-Jul-2026) - the value below is now stale/inert, only used if
+      # the grafana-data volume is ever wiped and Grafana re-bootstraps
+      # from scratch (in which case, set a new real password again on next
+      # first login - don't rely on this value being current).
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=ChangeMe_OnFirstLogin!
-      # Niren's Manager access (policy v1.1) maps to Grafana's built-in Editor
-      # role. No account exists for him yet - create it after first login via
-      # Server Admin > Users > New user (role: Editor). Consistent with the
-      # policy's own "reassignable later via admin panel" language - this
-      # isn't a gap, it's the documented provisioning step.
+      # Niren's Manager access (policy v1.1) maps to Grafana's built-in
+      # Editor role. Account created 22-Jul-2026 via Server Admin > Users >
+      # New user (role: Editor) - not managed via env vars/this file.
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_ANALYTICS_REPORTING_ENABLED=false
       - GF_ANALYTICS_CHECK_FOR_UPDATES=false
