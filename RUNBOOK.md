@@ -213,6 +213,8 @@ curl -s -G http://localhost:3100/loki/api/v1/query_range \
 ```
 Step 3 returning any `result` entries confirms the full pipe works: guardrails container → OTel auto-instrumentation → Loki's native OTLP endpoint → queryable. Then confirm visually in Grafana (`http://<VM-IP>:3001`, Explore > Loki > `{service_name="guardrails-uat"}`).
 
+**Verified 22-Jul-2026 (live on the VM):** all three checks passed. Both containers stayed `Up` after settling (no crash-loop recurrence — see the `opentelemetry-instrument` fix in Section 8's troubleshooting table). A real request through guardrails-uat (`"What is 12 times 8?"`) completed correctly. The Loki query returned the full decision trail for that request: `self_check_input` prompt/result (`allowed: true`), the main-model completion, `self_check_output` prompt/result (`allowed: true`), and the summary stat line (`3 total calls, 19.59s total, [7.87, 10.69, 0.93] latencies`) — end-to-end pipe confirmed working, Layer 1 is done.
+
 ## 7. Remaining phases (not yet built)
 
 - **Phase 3 follow-up:** Section 8 reasoning-trace visibility (root cause identified — see Section 6 — deprioritized 21-Jul, low operational value vs. effort), Section 2 "Flag + Log" tier for profanity, audit-log Layer 2 (structured per-request record — see Section 6.5).
@@ -233,6 +235,7 @@ Step 3 returning any `result` entries confirms the full pipe works: guardrails c
 | NeMo Guardrails: `"No guardrails config_id provided and server has no default configuration"` | `--config` pointed at a directory with `config.yml` directly in it, not a named sub-folder | Nest config under `/config/default/`, add `--default-config-id default` to the server command |
 | NeMo Guardrails: `"MAIN_MODEL_BASE_URL is not set"` | `config.yml`'s `parameters.base_url` alone isn't enough at runtime | Set `MAIN_MODEL_BASE_URL` / `SELF_CHECK_INPUT_MODEL_BASE_URL` / `SELF_CHECK_OUTPUT_MODEL_BASE_URL` env vars on the container |
 | NeMo Guardrails: `model 'default' not found` deep in a `generate_user_intent` traceback | Sent the guardrails config_id in the `"model"` field of the request instead of the actual LLM name | `"model"` must be the real model (e.g. `"qwen3:14b"`) — config_id is separate/automatic, not the same field |
+| guardrails-uat / guardrails-prod stuck `Restarting`, logs show `opentelemetry-instrument: error: ambiguous option: --config could match --config_file, --configurator` | `opentelemetry-instrument` dynamically registers a `--<flag>` for every `OTEL_*` env var and scans the FULL argv before splitting off the wrapped command — without a separator it matches nemoguardrails' own `--config` against its own option list | Add `--` between `opentelemetry-instrument` and the wrapped command in the Dockerfile `CMD` (see `guardrails/Dockerfile`); confirmed from `opentelemetry-python-contrib`'s actual `auto_instrumentation/__init__.py` source, not guessed |
 
 ## 9. Credentials and access
 
