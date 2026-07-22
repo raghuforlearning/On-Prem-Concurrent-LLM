@@ -34,12 +34,49 @@
 # passthrough). No client sends this yet (NL-Proposal-Builder integration is
 # Phase 5, not built), so this reads as "unspecified" until then - a known,
 # documented gap, not an oversight.
+#
+# INPUT RAIL - WHY THIS ISN'T A SIMPLE SECOND execute STATEMENT (found and
+# fixed 22-Jul-2026 in UAT, via a real deployment test, not guessed):
+# the built-in `self_check_input` action, when it blocks, returns an
+# ActionResult carrying a `mask_prev_user_message` event (verified from
+# nemoguardrails/library/self_check/input_check/actions.py source). The
+# Colang v1.0 runtime processes that event - including a global reaction
+# that jumps straight to `bot refuse to respond` - BEFORE control ever
+# returns to run a second statement in the calling flow. A first version of
+# this file tried `$allowed = execute self_check_input` followed by a
+# separate `execute audit_log_input(...)` line; live testing showed the
+# second line never ran for blocked requests (confirmed via the full event
+# trace in Loki - no audit_log_input execution anywhere in the trace,
+# despite it being registered at startup). Blocking itself was NOT affected
+# by this bug - only the audit log for blocked input was silently missing,
+# which is exactly the event policy Section 10.1 cares about most.
+#
+# Fix: log INSIDE a Python action that wraps `self_check_input` directly, so
+# the log call is synchronous and completes before the function even
+# returns - before the runtime has anything to race against. Confirmed safe
+# to call the underlying function directly (not through the dispatcher):
+# `@action(...)` (nemoguardrails/actions/actions.py, read from the running
+# container) is a plain metadata-tagging decorator - `return fn_or_cls`
+# unchanged, no wrapping - so calling the imported function IS calling the
+# exact same code the dispatcher would call. `self_check_input` also has no
+# `output_mapping` (unlike `self_check_output`, which does) so there is no
+# separate transformation step to worry about replicating.
+#
+# OUTPUT RAIL is deliberately NOT wrapped the same way: `self_check_output`
+# (verified from its own source) never returns an ActionResult or extra
+# events - just a plain bool - so there is no competing event to race
+# against, and the original two-statement design (execute, then log, then
+# check) is safe as originally written for that rail.
 
 import logging
 import os
 from typing import Optional
 
 from nemoguardrails.actions import action
+from nemoguardrails.actions.actions import ActionResult
+from nemoguardrails.library.self_check.input_check.actions import (
+    self_check_input as _self_check_input_impl,
+)
 
 audit_log = logging.getLogger("guardrail_audit")
 
@@ -154,11 +191,34 @@ def _emit(rail: str, allowed: bool, consumer: str, content: Optional[str]) -> No
     audit_log.info(message, extra=extra)
 
 
-@action(name="audit_log_input", is_system_action=True)
-async def audit_log_input(context: Optional[dict] = None, allowed: bool = True, **kwargs):
+@action(name="self_check_input_with_audit", is_system_action=True)
+async def self_check_input_with_audit(
+    llm_task_manager=None,
+    context: Optional[dict] = None,
+    llm=None,
+    config=None,
+    **kwargs,
+):
+    """Wraps the built-in self_check_input action - calls it, logs the
+    decision synchronously (before any downstream event processing can
+    race ahead), then returns the exact same result unchanged so every
+    other behavior (masking, exceptions, block enforcement) is preserved
+    byte-for-byte. See module docstring for why this exists.
+    """
     context = context or {}
-    _emit("input", allowed, _get_consumer(context), context.get("user_message"))
-    return True
+    result = await _self_check_input_impl(
+        llm_task_manager=llm_task_manager,
+        context=context,
+        llm=llm,
+        config=config,
+        **kwargs,
+    )
+    allowed = result.return_value if isinstance(result, ActionResult) else result
+    # Read user_message BEFORE returning - masking (if triggered) happens
+    # later, as a side effect of the runtime processing the returned event,
+    # which can only happen after this function returns.
+    _emit("input", bool(allowed), _get_consumer(context), context.get("user_message"))
+    return result
 
 
 @action(name="audit_log_output", is_system_action=True)
