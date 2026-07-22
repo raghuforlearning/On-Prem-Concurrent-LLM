@@ -35,4 +35,12 @@ EXPOSE 8000
 # call info) to Loki. Does not require nemoguardrails' own `tracing:` config
 # section - that's for distributed trace spans, which is a separate,
 # deliberately out-of-scope capability for now.
-CMD ["opentelemetry-instrument", "nemoguardrails", "server", "--config", "/config", "--port", "8000", "--default-config-id", "default"]
+# The `--` is required, not stylistic: opentelemetry-instrument dynamically
+# registers a --<flag> for every OTEL_* env var (including --config_file and
+# --configurator), and its argument parser scans the FULL argv for matches
+# before splitting off the wrapped command - without `--`, it tries to match
+# nemoguardrails' own "--config" against its own option list and fails with
+# "ambiguous option: --config could match --config_file, --configurator".
+# Confirmed from opentelemetry-python-contrib's actual auto_instrumentation
+# source (parser.parse_args() on full argv, not parse_known_args()).
+CMD ["opentelemetry-instrument", "--", "nemoguardrails", "server", "--config", "/config", "--port", "8000", "--default-config-id", "default"]
