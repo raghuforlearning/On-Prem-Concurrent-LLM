@@ -129,6 +129,10 @@ services:
       - OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true
       - OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://loki:3100/otlp/v1/logs
       - OTEL_EXPORTER_OTLP_LOGS_PROTOCOL=http/protobuf
+      # Layer 2 audit logging (Policy v1.1 Section 10.1) - label only, used
+      # by config_prod/default/actions.py for the "model" field on each
+      # audit log line. Must match this config's `type: main` model above.
+      - GUARDRAILS_MAIN_MODEL=qwen3:14b
     depends_on:
       - ollama
       - loki

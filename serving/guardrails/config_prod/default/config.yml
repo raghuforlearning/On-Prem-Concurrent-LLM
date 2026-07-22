@@ -5,6 +5,16 @@
 # their reasoning delimiters, which is what qwen3/deepseek-r1 produce.
 #
 # Same shared Ollama backend as UAT (single A30 - see policy Section 8.1).
+#
+# rails.input/output.flows reference "... with audit" flows (audit_flows.co)
+# instead of the library's built-in "self check input"/"self check output" -
+# Layer 2 structured audit logging (AI Guardrail Policy v1.1 Section 10.1),
+# promoted from UAT 22-Jul-2026 after full verification there: input
+# block/allow AND output block/allow all confirmed correct via live tests
+# and Loki queries (RUNBOOK.md Section 6.6) - not promoted on assumption.
+# actions.py and audit_flows.co are byte-identical to config_uat/default's -
+# only the environment differs, read at runtime from OTEL_RESOURCE_ATTRIBUTES
+# (docker-compose.yml), not from anything in this config directory.
 
 models:
   - type: main
@@ -32,7 +42,7 @@ models:
 rails:
   input:
     flows:
-      - self check input
+      - self check input with audit
   output:
     flows:
-      - self check output
+      - self check output with audit

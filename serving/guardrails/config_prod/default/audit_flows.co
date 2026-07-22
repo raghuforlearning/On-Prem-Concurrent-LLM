@@ -1,0 +1,52 @@
+# AI Guardrail Policy v1.1 Section 10.1 - Layer 2 structured audit logging
+# (UAT rollout, 22-Jul-2026).
+#
+# These two flows are based on NeMo Guardrails' own bundled v1.0
+# self_check_input/output flows, verified 22-Jul-2026 by reading the actual
+# source running inside the guardrails-uat container:
+#   /usr/local/lib/python3.11/site-packages/nemoguardrails/library/self_check/
+#     input_check/flows.v1.co
+#     output_check/flows.v1.co
+#
+# Given NEW flow names ("... with audit") rather than overriding the
+# built-in "self check input" / "self check output" names, so there is zero
+# ambiguity about which implementation wins at load time. config.yml's
+# rails.input.flows / rails.output.flows reference these new names instead
+# of the built-in ones.
+#
+# INPUT differs structurally from a simple "add one line" copy - see
+# actions.py's module docstring for why: logging a blocked input via a
+# second Colang statement was tried first and found (via live testing) to
+# silently never run, because the built-in action's block-path event races
+# ahead of it. The fix moves logging INSIDE a Python action
+# (self_check_input_with_audit) that wraps and calls through to the real
+# self_check_input, so this flow now calls that wrapper instead of
+# self_check_input directly - everything else about the flow (the
+# if/exception/refuse/stop logic) is unchanged from the built-in version.
+#
+# OUTPUT keeps the original "one added line" design: self_check_output
+# never returns extra events (verified from source), so there's no race to
+# guard against, and a plain second execute statement is safe there.
+#
+# Deliberately does NOT redefine `bot refuse to respond` here - it's already
+# defined by the library flows this config also loads; redefining it again
+# risked a duplicate-definition conflict for zero benefit.
+
+define flow self check input with audit
+  $allowed = execute self_check_input_with_audit
+  if not $allowed
+    if $config.enable_rails_exceptions
+      create event InputRailException(message="Input not allowed. The input was blocked by the 'self check input' flow.")
+    else
+      bot refuse to respond
+    stop
+
+define flow self check output with audit
+  $allowed = execute self_check_output
+  execute audit_log_output(allowed=$allowed)
+  if not $allowed
+    if $config.enable_rails_exceptions
+      create event OutputRailException(message="Output not allowed. The output was blocked by the 'self check output' flow.")
+    else
+      bot refuse to respond
+    stop
