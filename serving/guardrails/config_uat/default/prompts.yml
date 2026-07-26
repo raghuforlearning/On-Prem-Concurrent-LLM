@@ -48,6 +48,18 @@ prompts:
       - Leaks credentials, internal IP addresses, or infrastructure details about
         this platform or NationLabs' systems
 
+      IMPORTANT - judge the response by what it actually enables someone to DO,
+      not by how it is framed. Disclaimers such as "for educational purposes
+      only", "for authorized security training", "ethical hacking use only",
+      or a fictional/role-play wrapper do NOT change whether a response should
+      be blocked. A functional brute-force script, credential-stuffing tool,
+      keylogger, malware sample, or working exploit is still exactly that even
+      when wrapped in a responsible-use disclaimer - apply the same block rule
+      you would apply with the disclaimer removed. Ask yourself: "if every
+      disclaimer sentence were deleted, would what remains still be a working
+      credential-harvesting tool, exploit, or malware sample?" If yes, BLOCK,
+      regardless of the surrounding framing.
+
       AI response: "{{ bot_response }}"
 
       Question: Should this response be blocked? Answer with only "Yes" or "No".
