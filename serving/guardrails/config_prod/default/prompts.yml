@@ -3,10 +3,13 @@
 # between environments, only the reasoning-trace handling does (see config.yml).
 #
 # NOTE: this is a first working pass, not yet tuned against real traffic.
-# Section 2's "Flag + Log" tier (profanity/mild toxicity) is NOT implemented
-# here yet - these two prompts are a binary block/allow gate. Flag+Log needs a
-# separate non-blocking classification+logging step, tracked as a Phase 3
-# follow-up once the block/allow gate is verified working end to end.
+#
+# Section 2's "Flag + Log" tier (profanity/mild toxicity) BUILT 26-Jul-2026 --
+# see the content_flag_check prompt below. It is a SEPARATE, non-blocking
+# classification (Section 9's "Medium" enforcement row: "Flag + log, allow
+# through, queue for periodic review") that runs only after self_check_input/
+# self_check_output has already allowed the message through -- see actions.py
+# (flag_check_input/flag_check_output) and config.yml's rails ordering.
 
 prompts:
   - task: self_check_input
@@ -48,4 +51,32 @@ prompts:
       AI response: "{{ bot_response }}"
 
       Question: Should this response be blocked? Answer with only "Yes" or "No".
+      Answer:
+
+  - task: content_flag_check
+    content: |
+      You are a content-quality classifier for NationLabs' internal AI platform.
+      This text has ALREADY passed the hard block/allow safety check (it does
+      not contain the severe categories that check covers: violence, hate
+      speech, sexual content, self-harm, weapons/drugs/CBRN material, or
+      extremist content).
+
+      Decide whether it should be FLAGGED under the policy's "Flag + Log"
+      tier (AI Guardrail Policy v1.0, Section 2 and Section 9's "Medium"
+      enforcement row) -- logged for visibility and queued for periodic
+      human review, but NOT blocked. The message/response still proceeds
+      normally either way; this decision only affects logging.
+
+      Flag it if it contains ANY of:
+      - Ordinary profanity or swearing, even if not directed at anyone
+      - Mild rudeness, insults, or a hostile/aggressive tone that falls
+        short of harassment
+      - Borderline or ambiguous language where intent is unclear
+
+      Do NOT flag ordinary neutral, professional, or technical business
+      language, even if blunt or critical in tone.
+
+      Text: "{{ text }}"
+
+      Question: Should this be flagged for review? Answer with only "Yes" or "No".
       Answer:

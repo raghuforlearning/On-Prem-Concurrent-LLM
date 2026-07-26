@@ -1,0 +1,23 @@
+# AI Guardrail Policy v1.0 -- "Flag + Log" tier (Section 2, Section 9's
+# "Medium" enforcement row), added 26-Jul-2026.
+#
+# Listed AFTER "self check input with audit" / "self check output with
+# audit" in config.yml's rails.input/output.flows -- Colang's `stop`
+# statement in the block/allow flow above prevents this flow from ever
+# running when the message was already hard-blocked (verified empirically:
+# built a minimal standalone RailsConfig with two dummy flows and confirmed
+# via LLMRails.generate_async() that a `stop` in flow 1 does prevent flow 2's
+# action from executing at all -- not inferred from source reading alone).
+#
+# Deliberately two trivial one-line flows rather than folding this logic
+# into audit_flows.co's existing flows -- keeps the hard block/allow gate
+# (which has real event-racing subtleties on the input side, see actions.py)
+# completely separate from this purely-additive, never-blocking tier. Zero
+# risk of this new code interacting with the block-path bug already found
+# and fixed once in this file's history.
+
+define flow flag check input with audit
+  execute flag_check_input
+
+define flow flag check output with audit
+  execute flag_check_output

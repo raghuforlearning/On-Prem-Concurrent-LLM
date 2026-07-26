@@ -323,9 +323,45 @@ docker restart grafana
 
 Earlier ad-hoc Loki verification during Section 6.6's live testing didn't catch this — those queries used `|= "rail=input"` line-content matching against the log message text (which embeds `rail=input` literally in the message string), which succeeds regardless of whether the field is an actual label. Worth remembering for any future dashboard/alert built on these fields: **always confirm a field via `/loki/api/v1/labels` before writing a `{}` stream-selector query against it** — don't assume every `extra={}` field becomes an indexed label just because Layer 1's basic fields (service_name, environment) did.
 
+## 6.8 Phase 3 follow-up — "Flag + Log" tier + a real model-routing bug found while building it (26-Jul-2026)
+
+**Built:** the policy's Section 2 / Section 9 "Medium" enforcement tier — profanity and mild toxicity get logged for visibility and queued for periodic review, but are never blocked (the request/response proceeds normally either way). Deliberately kept separate from the existing hard block/allow gate (`self_check_input`/`self_check_output`) rather than folded into it, since prompts.yml's `self_check_input` prompt already explicitly instructs the model NOT to block ordinary profanity — that carve-out existed since 21-Jul-2026 but nothing implemented the "handled separately" half until now.
+
+**Files (config_uat and config_prod, kept byte-identical except the environment header comment, same pattern as always):**
+- `prompts.yml` — new `content_flag_check` task prompt.
+- `config.yml` — new `type: content_flag_check` model entry (gemma3:4b, same lightweight tier as the two self-check models), and `rails.input.flows`/`rails.output.flows` each gained a second entry (`flag check input/output with audit`) appended AFTER the existing block/allow flow.
+- `flag_flows.co` (new file) — two one-line flows calling `flag_check_input`/`flag_check_output`. Auto-loaded with no docker-compose.yml change needed — the whole `config_uat/default`/`config_prod/default` directory is already bind-mounted, not individual files (confirmed by reading `serving/docker-compose.yml`'s volume lines directly rather than assuming).
+- `actions.py` — new `flag_check_input`/`flag_check_output` actions. Never return a value that stops the pipeline; they can only add a `audit_action="flagged"` log line (category `profanity_mild_toxicity`, severity `medium`, content captured — same privacy carve-out as blocked events, since a flagged item needs its text for the human review queue).
+
+**A real bug found and fixed along the way, in already-deployed code:** while working out how nemoguardrails routes which LLM client gets injected into a custom action (needed this to make sure the new flag-check actions used the cheap gemma3:4b tier, not the main model), traced the actual mechanism in `colang/v1_0/runtime/runtime.py` (~line 644): it auto-injects the LLM registered for `f"{action_name}_llm"` — i.e. it requires the ACTION's own name to equal the MODEL TYPE name in `config.yml`. `self_check_input_with_audit` (built 22-Jul-2026, Section 6.6) was deliberately renamed away from the built-in `self_check_input` to dodge a Colang event-race bug on the blocked path — but that rename silently broke this unrelated auto-routing convention, since no `self_check_input_with_audit_llm` param exists, only `self_check_input_llm` does. The generic `llm` param it declared instead falls back to whatever's registered under the literal key `"llm"`, which is always the MAIN model (qwen3:14b).
+
+**Net effect: every input self-check, on both UAT and Prod, has been running on qwen3:14b instead of gemma3:4b since 22-Jul-2026** — a real latency/cost regression (the self-check pass got slower and more GPU-expensive than intended on every single request), not a security hole (the block/allow decision itself was still made correctly, just by a bigger/slower model than the design called for). `self_check_output` was NOT affected — it calls the built-in action directly under its own unchanged name, confirmed via the same trace.
+
+**Verified, not guessed, at every step:**
+1. Reproduced the exact runtime.py param-resolution logic standalone against the real, unmodified `self_check_input_with_audit` function — confirmed it resolves to the main model, then confirmed the fix (renaming the parameter to `self_check_input_llm`) resolves correctly to the lightweight model instead.
+2. Confirmed nemoguardrails supports plain string task names (not just its built-in `Task` enum) for a genuinely new task like `content_flag_check`, by reading `llm/prompts.py`'s `get_prompt()`/`get_task_model()` source directly (`Union[str, Task]` with an explicit string fallback) rather than assuming.
+3. Confirmed empirically (not inferred from reading Colang semantics alone) that a `stop` in the first flow of a `rails.input.flows` list actually prevents the second listed flow from running at all — built a minimal standalone two-flow `RailsConfig`, ran it through `LLMRails.generate_async()`, and confirmed the second flow's action never executed when the first one blocked.
+4. Loaded the REAL `config_uat` directory via `RailsConfig.from_path()` + `LLMRails()` (no Docker/Ollama needed for this — model client construction doesn't make a network call) and confirmed: all 4 flows load with the correct `rails.input/output.flows` ordering, all 4 models register, all 6 actions (including the fixed `self_check_input_with_audit` and the 2 new flag-check actions) register without error, and `content_flag_check_llm`/`self_check_input_llm` both appear correctly in `registered_action_params`.
+
+**NOT yet verified (needs the real VM):** the actual Groq/Ollama LLM call and the real classification quality of the `content_flag_check` prompt against real traffic — this sandbox has no live Ollama backend. Test on the VM before trusting the flag rate; the prompt is a first pass, same caveat prompts.yml's file header already carries for the two existing self-check prompts.
+
+**Deploy:**
+```
+git pull
+docker restart guardrails-uat guardrails-prod
+```
+No rebuild needed -- config (including actions.py) is mounted read-only at
+runtime, not baked into the image (see Dockerfile's own header comment), and
+no new Python dependency was added to requirements.txt. `docker restart`,
+not `docker compose up -d --no-deps` -- Compose only recreates a container
+when the service *definition* changes, not when a bind-mounted file's
+contents change on disk (same lesson already learned the hard way for
+Grafana provisioning, Section 6.7).
+Then confirm per the same 4-check pattern as every prior guardrails change (Section 6.6): containers come up clean, a hard-block prompt still refuses, a normal prompt still answers, and a profanity/mild-toxicity prompt (e.g. "this whole process is such bullshit, just fix it already") gets a NORMAL answer with a separate `audit_action="flagged" audit_category="profanity_mild_toxicity"` Loki line alongside the usual `audit_action="allowed"` line — confirming the flag tier logs without blocking. Also worth spot-checking Loki for `audit_model` on a few pre-existing "allowed" input-rail lines post-deploy, to confirm the self_check_input model-routing fix took effect (harder to verify directly since the log schema doesn't currently record which LLM answered the self-check itself, only the main model — worth adding if this needs re-confirming later).
+
 ## 7. Remaining phases (not yet built)
 
-- **Phase 3 follow-up:** Section 8 reasoning-trace visibility (root cause identified — see Section 6 — deprioritized 21-Jul, low operational value vs. effort), Section 2 "Flag + Log" tier for profanity, `self_check_output`'s apparent leniency toward "educational framing" content (see Section 6.6 finding, 22-Jul) — worth tuning, not yet scoped.
+- **Phase 3 follow-up:** Section 8 reasoning-trace visibility (root cause identified — see Section 6 — deprioritized 21-Jul, low operational value vs. effort), `self_check_output`'s apparent leniency toward "educational framing" content (see Section 6.6 finding, 22-Jul) — worth tuning, not yet scoped. Section 2 "Flag + Log" tier for profanity — BUILT 26-Jul-2026, see Section 6.8 above.
 - **Phase 5 — NL-Proposal-Builder integration:** update `src/anthropic.js`'s multi-provider router to add a "local" provider hitting the guardrails-prod endpoint (`http://192.168.71.11:8000/v1`), flip `AI_PROVIDER` in `.env`, test end to end, decide on a Groq/OpenAI fallback strategy.
 - **Phase 6 — Hand off to Niren:** give him the guardrails-prod endpoint for his agent framework. Confirm he understands the concurrency=1 shared-queue behavior — his agent traffic and proposal-generation traffic queue behind each other during this pilot, no priority lane yet.
 - **Phase 7 — Backlog:** document-vision (VLM) and embedding/reranker model tiers, evaluate migrating from Ollama to vLLM once concurrency needs grow (the VM's isolated driver — CUDA 13.3 — makes this a low-risk swap later), consider a priority queue so proposal generation isn't starved by agent traffic, consider MIG partitioning on the A30 for hard workload isolation if needed.

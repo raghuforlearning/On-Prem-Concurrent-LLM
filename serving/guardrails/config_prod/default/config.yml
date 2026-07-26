@@ -12,9 +12,21 @@
 # promoted from UAT 22-Jul-2026 after full verification there: input
 # block/allow AND output block/allow all confirmed correct via live tests
 # and Loki queries (RUNBOOK.md Section 6.6) - not promoted on assumption.
-# actions.py and audit_flows.co are byte-identical to config_uat/default's -
-# only the environment differs, read at runtime from OTEL_RESOURCE_ATTRIBUTES
-# (docker-compose.yml), not from anything in this config directory.
+# actions.py, audit_flows.co, flag_flows.co, and prompts.yml are all
+# byte-identical to config_uat/default's - only the environment differs,
+# read at runtime from OTEL_RESOURCE_ATTRIBUTES (docker-compose.yml), not
+# from anything in this config directory.
+#
+# Each flows list below runs a SECOND flow after the block/allow gate: "flag
+# check ... with audit" (flag_flows.co), implementing the policy's
+# non-blocking "Flag + Log" tier for profanity/mild toxicity (Section 2,
+# Section 9's "Medium" enforcement row -- added 26-Jul-2026, promoted here
+# same day after verification in UAT). If the first flow blocks, it calls
+# Colang's `stop`, so the flag-check flow never runs for blocked traffic. If
+# allowed, the flag-check flow runs next and can only add a "flagged" audit
+# log entry -- it never blocks or stops the pipeline itself. Confirmed this
+# `stop` behavior empirically (a minimal standalone RailsConfig test, not
+# inferred from source reading alone) before relying on it here.
 
 models:
   - type: main
@@ -39,10 +51,18 @@ models:
     parameters:
       base_url: http://ollama:11434/v1
 
+  - type: content_flag_check
+    engine: ollama
+    model: gemma3:4b
+    parameters:
+      base_url: http://ollama:11434/v1
+
 rails:
   input:
     flows:
       - self check input with audit
+      - flag check input with audit
   output:
     flows:
       - self check output with audit
+      - flag check output with audit

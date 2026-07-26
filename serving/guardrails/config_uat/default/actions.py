@@ -67,6 +67,37 @@
 # events - just a plain bool - so there is no competing event to race
 # against, and the original two-statement design (execute, then log, then
 # check) is safe as originally written for that rail.
+#
+# BUG FOUND AND FIXED 26-Jul-2026, while building the separate Flag+Log tier
+# (see bottom of this file): the wrapper above was declared with a parameter
+# literally named `llm`, expecting nemoguardrails' auto-routing to swap in
+# the lightweight self_check_input model (gemma3:4b) instead of the main
+# model. That auto-routing (colang/v1_0/runtime/runtime.py, ~line 644) keys
+# off `f"{action_name}_llm"` being a registered param -- i.e. it requires the
+# ACTION's own name to equal the MODEL TYPE name in config.yml. Renaming this
+# action to "self_check_input_with_audit" (to dodge the flow-name collision
+# above) silently broke that match: no
+# "self_check_input_with_audit_llm" param was ever registered, only
+# "self_check_input_llm" was (from config.yml's `type: self_check_input`
+# model) -- so the generic `llm` param fell back to the registered "llm" key,
+# which IS always present and points at the MAIN model. Net effect: every
+# input self-check since this wrapper was built (22-Jul-2026, both UAT and
+# Prod) has been running on qwen3:14b, not gemma3:4b as documented in the
+# Phase 3 testing report and project memory -- a real latency/cost
+# regression, not a security hole (the block/allow decision itself was still
+# correct, just made by a bigger/slower model than intended).
+#
+# Confirmed via a standalone reproduction of the exact runtime.py param-
+# injection logic against this real function (not guessed, not assumed from
+# reading the docs alone) -- see the commit message for this fix for the
+# reproduction script's result.
+#
+# FIX: the parameter is renamed from the generic `llm` to the SPECIFIC
+# `self_check_input_llm`, matching the auto-registered key exactly, and
+# passed through explicitly to `_self_check_input_impl(llm=self_check_input_llm, ...)`.
+# The self_check_output rail was NOT affected by this bug -- it calls the
+# built-in `self_check_output` action directly (name matches its model type
+# exactly), never wrapped/renamed, confirmed via the same reproduction.
 
 import logging
 import os
@@ -195,7 +226,11 @@ def _emit(rail: str, allowed: bool, consumer: str, content: Optional[str]) -> No
 async def self_check_input_with_audit(
     llm_task_manager=None,
     context: Optional[dict] = None,
-    llm=None,
+    self_check_input_llm=None,  # NOT "llm" -- see module docstring's 26-Jul-2026
+                                 # bug note. This exact param name is what
+                                 # nemoguardrails auto-populates with the
+                                 # gemma3:4b client registered for config.yml's
+                                 # `type: self_check_input` model.
     config=None,
     **kwargs,
 ):
@@ -209,7 +244,7 @@ async def self_check_input_with_audit(
     result = await _self_check_input_impl(
         llm_task_manager=llm_task_manager,
         context=context,
-        llm=llm,
+        llm=self_check_input_llm,
         config=config,
         **kwargs,
     )
@@ -225,4 +260,131 @@ async def self_check_input_with_audit(
 async def audit_log_output(context: Optional[dict] = None, allowed: bool = True, **kwargs):
     context = context or {}
     _emit("output", allowed, _get_consumer(context), context.get("bot_message"))
+    return True
+
+
+# ── "Flag + Log" tier -- profanity / mild toxicity ──────────────────────────
+# AI Guardrail Policy v1.0, added 26-Jul-2026. Read the actual policy tables
+# via python-docx before building this (not guessed from memory):
+#   Section 2: "Profanity / mild toxicity -> Flag + Log -> Logged for
+#               visibility, not blocked"
+#   Section 9 (Enforcement Behavior): "Medium (ambiguous/borderline) -> Flag
+#               + log, allow through, queue for periodic review -> e.g.
+#               Borderline profanity, unclear intent"
+#
+# This is DELIBERATELY separate from self_check_input/output's hard
+# block/allow gate -- prompts.yml's self_check_input prompt already says
+# "Do NOT block ordinary profanity or mild toxicity - that is handled
+# separately" (written 21-Jul-2026, implemented here). Runs as a SECOND,
+# non-blocking classification pass AFTER the hard-block gate has already
+# allowed the message through (see config.yml's rails.input/output.flows
+# ordering) -- it can only ever add a "flagged" audit log entry, never stop
+# the pipeline or refuse a response.
+#
+# Uses a plain STRING task name ("content_flag_check") rather than one of
+# the library's built-in Task enum members -- confirmed this is natively
+# supported by reading llm/prompts.py's get_prompt()/get_task_model(), both
+# typed `Union[str, Task]` with an explicit `str(task.value) if isinstance
+# (task, Task) else task` fallback for plain strings.
+#
+# Does its OWN minimal Yes/No parsing rather than calling
+# llm_task_manager.parse_task_output() -- that method is typed to only
+# accept a real Task enum member (llm/taskmanager.py's signature), and
+# self_check_input/output's use of it depends on a registered
+# "is_content_safe" output parser that has no reason to exist for a brand
+# new custom task. Manual parsing avoids relying on an internal fallback
+# path this task was never registered for.
+#
+# Model routing: the action parameters below are named `content_flag_check_llm`
+# (NOT the generic `llm`) so they pick up the lightweight model registered
+# for config.yml's new `type: content_flag_check` entry (gemma3:4b, same
+# tier as self_check_input/output) via nemoguardrails' auto-injection --
+# built this way from the start given the real bug just found and fixed
+# above in self_check_input_with_audit, which happened by using the
+# generic `llm` param name on a renamed action.
+
+from nemoguardrails.actions.llm.utils import llm_call, warn_if_truncated
+from nemoguardrails.context import llm_call_info_var
+from nemoguardrails.logging.explain import LLMCallInfo
+
+_FLAG_TASK = "content_flag_check"
+
+
+def _emit_flag(rail: str, consumer: str, content: Optional[str]) -> None:
+    # Distinct "flagged" action -- separate from _emit()'s allowed/blocked.
+    # Flagged traffic is NOT blocked (the request/response proceeds normally
+    # either way) but is logged WITH content captured for the human review
+    # queue the policy calls for ("queue for periodic review"), same privacy
+    # carve-out _emit() already applies to blocked events.
+    extra = {
+        "audit_rail": rail,
+        "audit_action": "flagged",
+        "audit_environment": ENVIRONMENT,
+        "audit_model": MAIN_MODEL,
+        "audit_consumer": consumer,
+        "audit_category": "profanity_mild_toxicity",
+        "audit_severity": "medium",
+        "audit_content": content or "",
+    }
+    audit_log.info(
+        f"guardrail_decision rail={rail} action=flagged environment={ENVIRONMENT} "
+        f"category=profanity_mild_toxicity severity=medium",
+        extra=extra,
+    )
+
+
+async def _run_flag_check(llm_task_manager, llm, config, text: Optional[str]) -> bool:
+    """Returns True if `text` should be flagged under the Flag+Log tier.
+    Never raises on missing/empty text -- just returns False (nothing to
+    check), same defensive pattern as self_check_input's own `if user_input`
+    guard."""
+    if not text:
+        return False
+
+    prompt = llm_task_manager.render_task_prompt(task=_FLAG_TASK, context={"text": text})
+    stop = llm_task_manager.get_stop_tokens(task=_FLAG_TASK)
+    max_tokens = llm_task_manager.get_max_tokens(task=_FLAG_TASK) or 1024
+
+    llm_call_info_var.set(LLMCallInfo(task=_FLAG_TASK))
+    llm_response = await llm_call(
+        llm,
+        prompt,
+        stop=stop,
+        llm_params={"temperature": config.lowest_temperature, "max_tokens": max_tokens},
+    )
+    warn_if_truncated(llm_response, _FLAG_TASK)
+    response = (llm_response.content or "").strip().lower()
+    audit_log.debug(f"flag-check raw response: `{response}`")
+    return response.startswith("yes") or response.startswith('"yes') or " yes" in response[:20]
+
+
+@action(name="flag_check_input", is_system_action=True)
+async def flag_check_input(
+    llm_task_manager=None,
+    context: Optional[dict] = None,
+    content_flag_check_llm=None,  # matches config.yml's `type: content_flag_check` model
+    config=None,
+    **kwargs,
+):
+    context = context or {}
+    text = context.get("user_message")
+    flagged = await _run_flag_check(llm_task_manager, content_flag_check_llm, config, text)
+    if flagged:
+        _emit_flag("input", _get_consumer(context), text)
+    return True  # NEVER blocks -- always let the pipeline continue regardless of result
+
+
+@action(name="flag_check_output", is_system_action=True)
+async def flag_check_output(
+    llm_task_manager=None,
+    context: Optional[dict] = None,
+    content_flag_check_llm=None,
+    config=None,
+    **kwargs,
+):
+    context = context or {}
+    text = context.get("bot_message")
+    flagged = await _run_flag_check(llm_task_manager, content_flag_check_llm, config, text)
+    if flagged:
+        _emit_flag("output", _get_consumer(context), text)
     return True

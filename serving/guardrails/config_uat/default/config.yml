@@ -12,6 +12,15 @@
 # structured-logging line each (AI Guardrail Policy v1.1 Section 10.1, Layer
 # 2 - see RUNBOOK.md Section 6.5/6.6, verified 22-Jul-2026). The block/allow
 # decision itself is unchanged; only logging was added.
+#
+# Each flows list runs a SECOND flow after the block/allow gate: "flag check
+# ... with audit" (flag_flows.co), implementing the policy's non-blocking
+# "Flag + Log" tier for profanity/mild toxicity (Section 2, Section 9's
+# "Medium" enforcement row -- added 26-Jul-2026). If the first flow blocks,
+# it calls Colang's `stop`, so the flag-check flow never runs for blocked
+# traffic (correct -- no need to flag something already logged as blocked).
+# If allowed, the flag-check flow runs next and can only add a "flagged"
+# audit log entry -- it never blocks or stops the pipeline itself.
 
 models:
   - type: main
@@ -37,10 +46,23 @@ models:
     parameters:
       base_url: http://ollama:11434/v1
 
+  # Same lightweight tier, dedicated model type for the Flag+Log
+  # classification (content_flag_check task, prompts.yml) -- kept as its
+  # own `type:` entry (not reusing self_check_input's) so its auto-injected
+  # action param is distinctly named `content_flag_check_llm`, matching the
+  # param name flag_check_input/flag_check_output declare in actions.py.
+  - type: content_flag_check
+    engine: ollama
+    model: gemma3:4b
+    parameters:
+      base_url: http://ollama:11434/v1
+
 rails:
   input:
     flows:
       - self check input with audit
+      - flag check input with audit
   output:
     flows:
       - self check output with audit
+      - flag check output with audit
