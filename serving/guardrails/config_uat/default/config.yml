@@ -3,6 +3,23 @@
 # untouched here, so testers can see the model's reasoning - this is the
 # difference from config_prod, which strips it.
 #
+# CORRECTION (26-Jul-2026): the `reasoning_config` block below (start_token/
+# end_token/remove_reasoning_traces) does NOT actually do this in
+# nemoguardrails 0.23.0 - confirmed by reading the installed library's
+# runtime source directly: those fields are declared on the Pydantic model
+# but never read anywhere else in the codebase. Before 26-Jul-2026, BOTH
+# UAT and Prod silently hid reasoning traces regardless of this setting,
+# because the server's own response-building code
+# (generation_response_to_chat_completion in nemoguardrails/server/schemas/
+# utils.py) never surfaces the computed reasoning_content field at all - a
+# gap in the library itself, not something fixable via config here. The
+# real fix is a runtime monkeypatch in actions.py (auto-loaded on config
+# load), applied to config_uat ONLY - see the "REASONING-TRACE VISIBILITY
+# PATCH" block at the bottom of actions.py and RUNBOOK.md Section 6.9 for
+# the full root-cause writeup and verification. This config.yml section is
+# left as-is (harmless no-op) as the policy-level statement of intent that
+# UAT should show reasoning; actions.py is what actually makes it happen.
+#
 # Points at the shared Ollama backend (single A30 - see policy Section 8.1,
 # there is no separate model/GPU for UAT, only a separate guardrail config).
 #

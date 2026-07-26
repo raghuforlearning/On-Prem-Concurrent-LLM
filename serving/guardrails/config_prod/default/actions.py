@@ -1,3 +1,17 @@
+# ---------------------------------------------------------------------------
+# NOTE (26-Jul-2026): config_uat/default/actions.py and this file are NO
+# LONGER byte-identical -- this is the first deliberate exception to that
+# convention (previously true for every prior change in this repo, see
+# RUNBOOK.md's Section 6.x history). config_uat's copy has an appended
+# "REASONING-TRACE VISIBILITY PATCH" block (a runtime monkeypatch of
+# nemoguardrails.server.api.generation_response_to_chat_completion) that
+# this file intentionally does NOT have, so Prod keeps hiding reasoning
+# traces per policy (config.yml header, Section 8). See RUNBOOK.md Section
+# 6.9 for the full root-cause writeup, why it's UAT-only, and how it was
+# verified. If you are diffing these two files expecting them to match,
+# this block (and only this block) is the expected, intentional delta.
+# ---------------------------------------------------------------------------
+
 # AI Guardrail Policy v1.1 Section 10.1 - Layer 2 structured audit logging
 # (UAT rollout, 22-Jul-2026).
 #

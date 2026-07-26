@@ -4,6 +4,20 @@
 # config_uat. DeepSeek and Nemotron-family models both use <think>/</think> as
 # their reasoning delimiters, which is what qwen3/deepseek-r1 produce.
 #
+# CORRECTION (26-Jul-2026): this `reasoning_config` block does not actually
+# do anything in nemoguardrails 0.23.0 (confirmed from the installed
+# library's own source - these fields are read nowhere at runtime). Prod
+# hiding reasoning traces was, until 26-Jul-2026, accidental rather than
+# caused by this setting - the library's server response code never
+# surfaced reasoning traces for EITHER environment. That is now fixed for
+# UAT only via a targeted actions.py monkeypatch (see config_uat/default/
+# actions.py and RUNBOOK.md Section 6.9). Prod deliberately does NOT get
+# that patch, so Prod's actual current behavior (hide reasoning) still
+# matches this file's stated intent - just via inaction/the original
+# library gap rather than via this config block. Left as-is as the
+# policy-level statement that Prod should hide reasoning; no code change
+# needed here for that to remain true.
+#
 # Same shared Ollama backend as UAT (single A30 - see policy Section 8.1).
 #
 # rails.input/output.flows reference "... with audit" flows (audit_flows.co)

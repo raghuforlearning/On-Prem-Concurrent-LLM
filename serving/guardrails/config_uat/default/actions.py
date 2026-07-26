@@ -388,3 +388,93 @@ async def flag_check_output(
     if flagged:
         _emit_flag("output", _get_consumer(context), text)
     return True
+
+
+# ---------------------------------------------------------------------------
+# REASONING-TRACE VISIBILITY PATCH (UAT ONLY) -- 26-Jul-2026
+#
+# Policy intent (config.yml header, Section 8): UAT should show the model's
+# <think>...</think> reasoning trace to testers; Prod should hide it. Before
+# today, BOTH environments silently hid it -- this is a real bug in
+# nemoguardrails 0.23.0's own server code, not something fixable via
+# config.yml alone. Root cause, traced from the installed library's actual
+# source (not guessed):
+#
+#   1. `GuardrailsChatCompletionRequest.options` (server/schemas/generation_
+#      options.py-adjacent request schema) is declared with
+#      `Field(default_factory=GenerationOptions)` -- so `options` is ALWAYS
+#      a truthy object server-side, even when the client sends no "options"
+#      key. This forces `llmrails.py`'s `generate_async()` to always take
+#      its `if gen_options:` branch.
+#   2. That branch DOES compute `reasoning_content` (via
+#      `extract_bot_thinking_from_events`) and sets it on the internal
+#      `GenerationResponse` -- but nothing downstream ever reads that field.
+#      `generation_response_to_chat_completion()` (server/schemas/utils.py)
+#      builds the final HTTP JSON from `bot_message`/`tool_calls` only.
+#      Neither `GuardrailsDataOutput` nor `ChatCompletionMessage` has any
+#      reasoning field at all. The trace is computed, then silently dropped.
+#   3. The `else` branch (which DOES correctly inline
+#      `<think>{reasoning_content}</think>\n` into the message content) is
+#      dead code in practice, because branch 1 is always taken.
+#
+# Fix: monkeypatch the function that builds the HTTP response so it inlines
+# the reasoning trace the same way the (unreachable) else-branch would have.
+#
+# IMPORTANT -- which name to patch: `nemoguardrails/server/api.py` does
+# `from nemoguardrails.server.schemas.utils import
+# generation_response_to_chat_completion` -- a direct name-binding import.
+# Patching `nemoguardrails.server.schemas.utils`'s copy of the function does
+# NOT affect `api.py`'s already-bound reference (verified empirically this
+# session with a standalone reproduction). The patch below therefore targets
+# `nemoguardrails.server.api.generation_response_to_chat_completion`
+# directly -- the name as bound in api.py's own module namespace, which is
+# what the request-handling route actually calls.
+#
+# UAT ONLY: config_prod/default/actions.py deliberately does NOT include
+# this block -- see the note at the top of that file. This is the first
+# deliberate exception to the "config_uat and config_prod stay byte-
+# identical" convention used everywhere else in this repo.
+#
+# Version-pinned: this patch's correctness depends on nemoguardrails
+# 0.23.0's exact internals (see serving/guardrails/requirements.txt, pinned
+# 26-Jul-2026 for this reason). Wrapped in try/except so that a future,
+# deliberate version bump fails SAFE (falls back to hidden reasoning, logs a
+# warning) instead of crashing the container -- re-verify against
+# RUNBOOK.md Section 6.9 before bumping the pin.
+#
+# Verified 26-Jul-2026 via a full FastAPI TestClient request against the
+# real /v1/chat/completions route (main model + self-check + flag-check
+# models all mocked, real Colang/rails pipeline executed unmodified): the
+# response's message content came back as
+# "<think>...reasoning...</think>\n<final answer>", confirming the patch
+# works through the complete request cycle, not just in isolation.
+# NOT yet verified against the real VM's actual Ollama-backed model output
+# (no live Ollama in the sandbox this was built in) -- test on the VM per
+# RUNBOOK.md Section 6.9 before fully trusting this in front of testers.
+try:
+    import nemoguardrails.server.api as _ng_server_api
+    from nemoguardrails.server.schemas.utils import (
+        generation_response_to_chat_completion as _original_gen_resp_to_chat_completion,
+    )
+
+    def _reasoning_visible_generation_response_to_chat_completion(
+        response, model, config_id=None
+    ):
+        result = _original_gen_resp_to_chat_completion(response, model, config_id=config_id)
+        reasoning = getattr(response, "reasoning_content", None)
+        if reasoning and result.choices:
+            existing = result.choices[0].message.content or ""
+            result.choices[0].message.content = f"<think>{reasoning}</think>\n{existing}"
+        return result
+
+    _ng_server_api.generation_response_to_chat_completion = (
+        _reasoning_visible_generation_response_to_chat_completion
+    )
+    audit_log.info(
+        "UAT reasoning-trace visibility patch applied (nemoguardrails 0.23.0)."
+    )
+except Exception as e:  # pragma: no cover -- defensive: never crash the container over this
+    audit_log.warning(
+        f"UAT reasoning-trace visibility patch failed to apply, reasoning stays "
+        f"hidden (safe default): {e}"
+    )

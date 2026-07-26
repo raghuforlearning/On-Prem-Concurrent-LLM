@@ -1,4 +1,11 @@
-nemoguardrails>=0.13.0
+nemoguardrails==0.23.0  # Pinned 26-Jul-2026: reasoning-trace visibility patch
+                        # (config_uat/default/actions.py) targets this exact
+                        # version's internals (nemoguardrails.server.api's
+                        # generation_response_to_chat_completion binding). An
+                        # unpinned range risked a future rebuild silently
+                        # breaking or no-op'ing the patch. Bump deliberately and
+                        # re-verify the patch (see RUNBOOK.md Section 6.9) before
+                        # moving this pin.
 litellm
 uvicorn
 fastapi
