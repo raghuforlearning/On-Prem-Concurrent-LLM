@@ -33,9 +33,22 @@ services:
     volumes:
       - ollama:/root/.ollama
     environment:
-      # Niren's spec: max initial concurrency 1. Raise this once real usage
-      # patterns justify it - see RUNBOOK.md Phase 7 backlog.
-      - OLLAMA_NUM_PARALLEL=1
+      # Raised 1 -> 2 (28-Jul-2026): real usage now justifies it, per
+      # Niren's own original condition ("raise once real usage patterns
+      # justify it"). Trigger: real capacity planning ahead of Prod go-live
+      # showed 3-4 concurrent Proposal Builder users alone can queue past
+      # Nginx's 120s timeout at parallel=1 (worst case ~3-4 requests deep,
+      # each up to ~90s) -- and the confirmed near-term roadmap adds
+      # Accounts/Finance/HR agents (11-12 total users) on this same GPU
+      # shortly after. VRAM headroom check before raising: qwen3:14b
+      # (~9.3GB) + gemma3:4b (~3.3GB) resident = ~12.6GB used of 24GB,
+      # ~11GB free -- expected to comfortably fit a second concurrent
+      # stream's KV cache at num_ctx=8192, but this MUST be verified live
+      # (nvidia-smi / docker stats under real 2-concurrent load) before
+      # trusting it for Prod traffic, not assumed from this estimate alone.
+      # See RUNBOOK.md Phase 7 backlog and the 28-Jul-2026 capacity plan
+      # docs for the full analysis.
+      - OLLAMA_NUM_PARALLEL=2
       # Raised 1 -> 2 (21 Jul 2026, Phase 3 follow-up): the A30's 24GB VRAM
       # can't hold all THREE model tiers resident at once (14B Q4 ~8-9GB +
       # 32B Q4 ~18-20GB alone exceeds it), but it CAN hold any one main tier

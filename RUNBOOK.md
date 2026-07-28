@@ -78,7 +78,7 @@ Two manual steps after the script (can't be scripted — both need a fresh sessi
 
 Deployed via `serving/docker-compose.yml`. Key config, and why:
 
-- `OLLAMA_NUM_PARALLEL=1` — matches Niren's initial concurrency spec for the pilot
+- `OLLAMA_NUM_PARALLEL=2` (raised from `1` on 28-Jul-2026 — see Section 6.10) — matched Niren's initial concurrency spec of `1` for the pilot, raised once real capacity planning ahead of Prod go-live showed 3-4 concurrent Proposal Builder users alone risk queuing past Nginx's timeout, with Accounts/Finance/HR agents adding to the same GPU shortly after
 - `OLLAMA_MAX_LOADED_MODELS=2` (raised from `1` on 21 Jul 2026, Phase 3 follow-up — see Section 6) — the A30's 24GB VRAM cannot hold all three model tiers resident simultaneously (14B Q4 is ~8-9GB, 32B Q4 is ~18-20GB — those two alone exceed 24GB together), but it can hold any one main tier alongside `gemma3:4b` (~3.3GB), which every guardrailed request also calls for self-check. At `1`, every guardrailed request forced 2-3 sequential cold model swaps; at `2`, `gemma3:4b` stays resident permanently and only the main tier swaps
 - `OLLAMA_KEEP_ALIVE=30m` — see the cold-start note below; a longer keep-alive reduces how often intermittent traffic re-pays the cold-start cost
 
@@ -415,11 +415,33 @@ curl -X POST http://localhost:8001/v1/chat/completions -H "Content-Type: applica
 ```
 Before this fix, this returned working code. After, expect `"I'm sorry, I can't respond to that."` If it still passes through, the prompt change alone wasn't enough and this needs a different approach (e.g. a stronger model for `self_check_output`, or a second-pass classifier specifically for "disclaimer-wrapped" content) — don't assume the fix worked without re-testing this exact prompt.
 
+## 6.11 Raise OLLAMA_NUM_PARALLEL 1 -> 2 ahead of Prod go-live — 28-Jul-2026
+
+**Background:** Section 6 originally set `OLLAMA_NUM_PARALLEL=1` to match Niren's initial pilot spec, with an explicit note to "raise this once real usage patterns justify it." Real capacity planning ahead of NL-Proposal-Builder's Prod go-live (see the 28-Jul-2026 capacity-plan docs shared with Niren) found that concurrency=1 is fully serialized -- confirmed earlier by direct load testing (Section 6, 5 concurrent requests completed in an even ~4.2s staircase, not in parallel) -- and that 3-4 concurrent Proposal Builder users alone, worst case, can queue long enough to exceed Nginx's 120s proxy timeout on the Proposal Builder side (3 requests ahead at up to ~90s each + the request's own generation time). The confirmed near-term roadmap also adds Accounts (2 users), Finance (3 users), and HR (3 users) onto this same GPU shortly after -- 11-12 total users at full scope. This is the real-usage trigger the original comment was waiting for.
+
+**Change:** `serving/docker-compose.yml`'s `ollama` service: `OLLAMA_NUM_PARALLEL` raised from `1` to `2`.
+
+**VRAM check before raising (estimate, not yet live-verified):** `qwen3:14b` (~9.3GB) + `gemma3:4b` (~3.3GB) sit resident together today (per Section 6, `OLLAMA_MAX_LOADED_MODELS=2`), using ~12.6GB of the A30's 24GB, leaving ~11GB free. A second concurrent generation stream's KV cache at `num_ctx=8192` is expected to fit comfortably in that headroom, but Ollama's actual per-stream memory behavior for this exact model/context combination has not been measured -- this is an estimate, not a guarantee.
+
+**NOT yet verified — needs the real VM, in this order, before trusting this for Prod traffic:**
+```
+git pull
+docker compose up -d --no-deps ollama
+```
+(`--no-deps` avoids recreating `guardrails-uat`/`guardrails-prod`, which don't need to restart for this change.)
+
+1. Confirm the container actually picked up the new value: `docker exec ollama env | grep OLLAMA_NUM_PARALLEL` should show `2`.
+2. Fire 2 genuinely simultaneous requests at the UAT guardrails endpoint (port 8001, not Prod) and confirm they complete in an OVERLAPPING window, not a serialized staircase like the old Section 6 test -- this is the actual proof concurrency=2 is working, not just configured.
+3. Watch `nvidia-smi` (or `docker stats`) DURING that 2-concurrent test for real VRAM usage -- confirm no OOM and headroom holds. If it doesn't, revert to `OLLAMA_NUM_PARALLEL=1` immediately (same file, same restart command) rather than leaving a memory-pressure risk live.
+4. Only after 1-3 pass cleanly: consider this safe for Prod traffic too, since `ollama` is a single shared backend for both UAT and Prod guardrails endpoints -- there is no way to stage this change to UAT only at the model-serving layer, unlike app-level config.
+
+**Rollback:** set `OLLAMA_NUM_PARALLEL` back to `1` in `docker-compose.yml`, `git pull` + `docker compose up -d --no-deps ollama` on the VM. No data loss risk either direction -- this is a serving-concurrency setting, not a stateful change.
+
 ## 7. Remaining phases (not yet built)
 
 - **Phase 3 follow-up:** Section 8 reasoning-trace visibility — FIXED 26-Jul-2026, see Section 6.9 (UAT-only runtime patch; live-VM Ollama verification still pending). `self_check_output`'s leniency toward "educational framing" content — prompt tightened 26-Jul-2026, see Section 6.10 (live-VM re-test of the exact Section 6.6 finding prompt still pending — this is a model-judgment change, not a deterministic code fix, so it needs a real re-test more than most). Section 2 "Flag + Log" tier for profanity — BUILT 26-Jul-2026, see Section 6.8 above.
 - **Phase 5 — NL-Proposal-Builder integration:** update `src/anthropic.js`'s multi-provider router to add a "local" provider hitting the guardrails-prod endpoint (`http://192.168.71.11:8000/v1`), flip `AI_PROVIDER` in `.env`, test end to end, decide on a Groq/OpenAI fallback strategy.
-- **Phase 6 — Hand off to Niren:** give him the guardrails-prod endpoint for his agent framework. Confirm he understands the concurrency=1 shared-queue behavior — his agent traffic and proposal-generation traffic queue behind each other during this pilot, no priority lane yet.
+- **Phase 6 — Hand off to Niren:** give him the guardrails-prod endpoint for his agent framework. Confirm he understands the shared-queue behavior — concurrency raised 1->2 on 28-Jul-2026 (Section 6.11), but his agent traffic and proposal-generation traffic still queue behind each other beyond that, no priority lane yet.
 - **Phase 7 — Backlog:** document-vision (VLM) and embedding/reranker model tiers, evaluate migrating from Ollama to vLLM once concurrency needs grow (the VM's isolated driver — CUDA 13.3 — makes this a low-risk swap later), consider a priority queue so proposal generation isn't starved by agent traffic, consider MIG partitioning on the A30 for hard workload isolation if needed.
 
 ## 8. Troubleshooting quick reference
