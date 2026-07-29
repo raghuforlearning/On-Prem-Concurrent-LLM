@@ -64,6 +64,22 @@ services:
       # occasional agent calls) keeps re-paying that cost. 30m is a starting
       # point, not a tuned value - revisit once real traffic patterns are known.
       - OLLAMA_KEEP_ALIVE=30m
+      # Added 29-Jul-2026 (Section 6.12). ROOT CAUSE: 6.11's NUM_PARALLEL 1->2
+      # doubled KV cache and silently undid the MAX_LOADED_MODELS=2 fix above --
+      # models stopped fitting together and every request paid ~30s of reloads.
+      # MEASURED live via /api/ps: qwen3:14b = 19.74GB, gemma3:4b = 3.80GB =
+      # 23.5GB on a 24.5GB card. OLLAMA_CONTEXT_LENGTH was UNSET, so Ollama
+      # auto-chose 32768 per slot x 2 slots = 65536 -- 4x the num_ctx=8192 the
+      # 6.11 comment above assumed but never actually set. Ollama's scheduler
+      # log (sched.go:557) showed it predicting 13.7GiB for gemma3:4b, which
+      # really uses 3.49GB -- it over-predicts ~4x because its estimator ignores
+      # gemma3's sliding-window attention, so it REFUSED to load on a bad guess
+      # rather than genuinely running out. Pinning the context removes the
+      # guesswork; q8_0 KV halves what remains. Result: 10.55 + 3.04 = 13.6GB,
+      # both resident, ~11GB free. See RUNBOOK.md Section 6.12.
+      - OLLAMA_FLASH_ATTENTION=1
+      - OLLAMA_KV_CACHE_TYPE=q8_0
+      - OLLAMA_CONTEXT_LENGTH=8192
     deploy:
       resources:
         reservations:

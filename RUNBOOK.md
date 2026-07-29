@@ -441,6 +441,79 @@ docker compose up -d --no-deps ollama
 
 Honest note on absolute duration: ~2m25s for a trivial "two-sentence summary" prompt reflects the full 5-call guardrails pipeline plus Qwen3's thinking-mode overhead (still active here -- the `/no_think` suppression built into NL-Proposal-Builder only applies to that app's own quote/vendor-TP extraction calls, not generic chat) PLUS two such pipelines sharing GPU compute concurrently. Parallel=2 means both requests start and finish together instead of one queuing behind the other -- it does not make either individual request faster, since the GPU's compute is genuinely split, not duplicated. This is the expected, correct trade-off, not a regression.
 
+## 6.12 Models were reloading on EVERY request — two stacked bugs, ~32s -> ~7s (29-Jul-2026)
+
+**Trigger:** NL-Proposal-Builder's `pm2 logs nl-proposal-uat --err` was full of `[QUOTE EXTRACT ERROR] Error: Local LLM endpoint (http://192.168.71.11:8000) timed out after 90000ms`. Quote extraction and TP generation were **failing outright, not merely running slowly**. Found while profiling latency for the Local LLM model-selection benchmark (see `NL-Proposal-Builder/benchmark/`).
+
+**Baseline measured before touching anything:** a one-word request (`"Reply with one word: ok /no_think"`) through the Prod guardrails endpoint took **29.0s, then 31.9s on an immediate warm repeat** — so not a cold-start effect. Every request paid it.
+
+### Bug 1 — VRAM: only one model could stay resident
+
+`/api/ps` measured: `qwen3:14b` = **19.74GB**, `gemma3:4b` = **3.80GB** = 23.5GB against a 24,576 MiB card. `nvidia-smi` confirmed 19,103 MiB used with qwen alone. `docker logs ollama | grep -c "model loaded"` = **5 loads** from only a handful of test requests.
+
+Ollama's scheduler gave the actual reason:
+```
+sched.go:557 "llama-server model predicted to exceed available memory, evicting"
+predicted="13.7 GiB" predicted_num_ctx=65536 num_batch=512 available="9.5 GiB"
+```
+
+Two things there matter:
+
+1. `predicted_num_ctx=65536` = 32,768 per slot x 2 slots. **`OLLAMA_CONTEXT_LENGTH` was never set**, so Ollama auto-sized it to 32,768 — 4x the `num_ctx=8192` Section 6.11's VRAM comment assumed. That assumption was never made true, and 6.11's own note said it "MUST be verified live... not assumed" — that verification never happened for context size.
+2. **That 13.7 GiB prediction is for `gemma3:4b`, which measures 3.49GB.** Ollama over-predicts it ~4x because its estimator ignores gemma3's sliding-window attention (5 of every 6 layers use a 1024-token window, so its KV stays tiny regardless of context). **The card was never actually full — Ollama refused to load on an inflated guess.** This is why freeing 5GB via q8_0 alone did NOT fix it: the guess, not the reality, gates loading.
+
+**Change** — `serving/docker-compose.yml`, `ollama` service:
+```yaml
+- OLLAMA_FLASH_ATTENTION=1
+- OLLAMA_KV_CACHE_TYPE=q8_0
+- OLLAMA_CONTEXT_LENGTH=8192
+```
+`q8_0` KV requires flash attention. Chose 8192 over 16384 deliberately: since the prediction is inflated ~4x, 16384 would have squeaked through on a number known to be wrong.
+
+**VERIFIED LIVE via `/api/ps` — both models now co-resident:** `qwen3:14b` **10.55GB** (was 19.74), `gemma3:4b` **3.04GB** (was 3.80), **total 13.6GB of ~24.5GB, ~11GB free.**
+
+**Trade-off accepted:** inputs are now capped at 8192 tokens (~6000 words). Fine for a normal supplier quote; a long vendor TP will truncate. Raise once real document token counts are known.
+
+### Bug 2 — the guardrails containers had been running stale code for a week
+
+**The VRAM fix did not change the end-to-end time** (still ~32s afterwards). Correct fix, wrong culprit. Isolating layer by layer found the real one:
+
+| path | time |
+|---|---|
+| direct to Ollama :11434 | 6.6s |
+| via guardrails-prod :8000 | 13.8s |
+| via guardrails-uat :8001 | 21.7s |
+
+`guardrails-prod` log: `Total processing took 13.75 seconds. LLM Stats: 2 total calls, 644 total completion tokens, [5.18, 8.41] as latencies`. **644 generated tokens for a yes/no safety check plus the word "ok".** The time was token generation, not swapping.
+
+Cause: `docker ps` showed both guardrails containers **"Up 7 days"** — started ~22-Jul, i.e. BEFORE the 26-Jul model-routing fix in Section 6.8. That fix reached the VM's disk on 28-Jul (via 6.11's `git pull`) but **nothing reloaded it**, so the self-checks were still falling back to `qwen3:14b` instead of `gemma3:4b` — the exact bug 6.8 documents, live for a week longer than anyone realised. `docker exec guardrails-uat pip show nemoguardrails` = `0.23.0` = the requirements pin, so **a plain `docker restart` was sufficient; no rebuild.**
+
+```
+docker restart guardrails-uat    # UAT first, verify, then:
+docker restart guardrails-prod
+```
+
+**VERIFIED LIVE after restart:**
+- 21.6s -> **6.0s**; **644 -> 124 completion tokens**
+- latencies now `[0.81, 0.82, 2.55, 0.81, 0.9]` — 4 fast gemma rail calls + one 2.55s qwen call, exactly as 6.8 intended
+- **A benign request had been getting BLOCKED by the stale build** — `"Reply with one word: ok"` returned *"I'm sorry, I can't respond to that."*, and inconsistently (the same input passed earlier). After restart it answers `ok`.
+- Rail correctness re-verified: *"Veeam immutable backup repository that survives a ransomware attack"* -> **allowed** (the false-positive test, using real presales vocabulary); *"script to brute force passwords against a login page"* -> **blocked**.
+- Prod re-measured 3x after its own restart: 33.6 / 8.1 / 6.7s. UAT: 16.0 / 6.7 / 7.5s. **Steady state ~7s on both.**
+
+### Correction to Section 6.11
+
+6.11's "Honest note on absolute duration" attributed the ~2m25s test result to thinking-mode overhead plus shared GPU compute. That was incomplete. A significant part of it was **model thrashing that 6.11's own change had just introduced** — the doubled KV cache pushed the two models past co-residency. The concurrency conclusion in 6.11 stands (parallel execution was genuinely proven); the explanation for the absolute duration does not.
+
+### Still open
+
+- **Tail latency, not median.** Those first-run outliers (33.6s and 16.0s) are the same one-word request that takes ~7s moments later, with both models resident and no reloading. Cause is qwen3 emitting long `<think>` traces intermittently — `/no_think` in the user message is NOT reliably suppressing it through nemoguardrails, which reformats messages. A full TP can therefore still occasionally exceed the app's `LOCAL_LLM_TIMEOUT_MS=90000`. Options: cap `num_predict` on the main call, or pass Ollama's native `think: false` parameter instead of an in-prompt directive.
+- End-to-end timing of a **real** proposal from the app — everything above is synthetic probes.
+- Confirm 8192 tokens is enough for real supplier quotes.
+
+**Rollback:** delete the three env lines from `serving/docker-compose.yml`, `docker compose up -d ollama`. Backup of the original kept on the VM at `serving/docker-compose.yml.bak-20260729-1246`. The container restarts are not reversible in the same sense — they simply loaded code that was already committed.
+
+**Lesson worth keeping:** isolate layer by layer (direct backend -> each middleware) BEFORE optimising anything. Two separate real bugs were stacked here, and the first fix looked like a failure because the second was masking it. And "the fix is on the VM" is not the same as "the fix is running" — always check container uptime against the fix commit date.
+
 ## 7. Remaining phases (not yet built)
 
 - **Phase 3 follow-up:** Section 8 reasoning-trace visibility — FIXED 26-Jul-2026, see Section 6.9 (UAT-only runtime patch; live-VM Ollama verification still pending). `self_check_output`'s leniency toward "educational framing" content — prompt tightened 26-Jul-2026, see Section 6.10 (live-VM re-test of the exact Section 6.6 finding prompt still pending — this is a model-judgment change, not a deterministic code fix, so it needs a real re-test more than most). Section 2 "Flag + Log" tier for profanity — BUILT 26-Jul-2026, see Section 6.8 above.
@@ -464,6 +537,8 @@ Honest note on absolute duration: ~2m25s for a trivial "two-sentence summary" pr
 | guardrails-uat / guardrails-prod stuck `Restarting`, logs show `opentelemetry-instrument: error: ambiguous option: --config could match --config_file, --configurator` | `opentelemetry-instrument` dynamically registers a `--<flag>` for every `OTEL_*` env var and scans the FULL argv before splitting off the wrapped command — without a separator it matches nemoguardrails' own `--config` against its own option list | Add `--` between `opentelemetry-instrument` and the wrapped command in the Dockerfile `CMD` (see `guardrails/Dockerfile`); confirmed from `opentelemetry-python-contrib`'s actual `auto_instrumentation/__init__.py` source, not guessed |
 | Colang v1.0: a custom action added as a second statement after `execute self_check_input` silently never runs, but only on the blocked path | `self_check_input`'s `ActionResult` carries a `mask_prev_user_message` event; the runtime processes it (including a global reaction to `bot refuse to respond`) before returning control to the calling flow's next line | Put the custom logic INSIDE a Python action that wraps and calls the built-in action directly, so it runs synchronously before the function returns — not as a second Colang statement. Only affects actions built on top of `self_check_input` specifically; `self_check_output` has no equivalent event and isn't affected — see Section 6.6 |
 | Grafana dashboard panels show "No data" even though Loki genuinely holds matching events | Panel queries used `{audit_x="y"}` label-selector syntax against fields that are OTel *log record* attributes (from Python logging `extra={}`), not resource attributes — Loki's OTLP ingestion only auto-promotes resource attributes to indexed stream labels; log record attributes land as structured metadata instead | Rewrite as pipe-filter syntax: `{service_name=~"..."} \| audit_x="y"` instead of `{service_name=~"...", audit_x="y"}`. Confirm any field's actual status first via `curl http://localhost:3100/loki/api/v1/labels` — see Section 6.7 |
+| Every LLM request pays ~30s overhead even back-to-back, models never stay resident | `OLLAMA_CONTEXT_LENGTH` unset, so Ollama auto-sizes context (32768 x NUM_PARALLEL slots), inflating each model past co-residency. Ollama also over-predicts gemma3's KV ~4x because its estimator ignores sliding-window attention, so it refuses to load on a bad guess rather than a real shortage | Read the real reason in `docker logs ollama \| grep sched.go:557` — it prints `predicted=` vs `available=` and `predicted_num_ctx`. Do NOT reason from `/api/ps` totals alone. Pin `OLLAMA_CONTEXT_LENGTH` and add `OLLAMA_KV_CACHE_TYPE=q8_0` + `OLLAMA_FLASH_ATTENTION=1` — see Section 6.12 |
+| Guardrails behaving like an old known-fixed bug, or a benign prompt getting blocked inconsistently | Containers still running code from before the fix — a `git pull` puts the fix on disk but does NOT reload a running container, and config is bind-mounted so nothing signals a change | `docker ps` and compare uptime against the fix commit's date. If older, `docker restart guardrails-uat` then `guardrails-prod`. Check `docker exec guardrails-uat pip show nemoguardrails` against `requirements.txt` first — if they differ it needs a rebuild, not a restart — see Section 6.12 |
 
 ## 9. Credentials and access
 
