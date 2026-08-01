@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Paste Vendor Response — RFQ #{{ rfq_id }}</h2>
+<form method="post" class="form">
+  <textarea name="response_text" rows="15" required
+            placeholder="Paste the vendor's reply email / quote text here..."></textarea>
+  <button type="submit">Process Response</button>
+</form>
+<p class="muted">gemma3:4b classifies the response; if it is a quotation, qwen3:14b extracts
+the line items. The original is preserved unmodified.</p>
+{% endblock %}

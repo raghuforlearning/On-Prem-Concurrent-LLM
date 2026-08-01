@@ -1,0 +1,34 @@
+# New services ONLY — ollama / grafana / loki / open-webui / guardrails already
+# run on this host and must NOT be redefined here.
+services:
+  orchestrator:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: nationlabs-orchestrator:1.0
+    container_name: nl-orchestrator
+    restart: unless-stopped
+    environment:
+      NL_RUNTIME_ROOT: /opt/nationlabs
+      NL_OLLAMA_URL: http://192.168.71.11:11434   # host ollama; or 'ollama' if same docker network
+    volumes:
+      - /opt/nationlabs:/opt/nationlabs
+    ports:
+      - "8100:8100"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  followup-cron:
+    image: nationlabs-orchestrator:1.0
+    container_name: nl-followup-cron
+    restart: unless-stopped
+    depends_on: [orchestrator]
+    environment:
+      NL_RUNTIME_ROOT: /opt/nationlabs
+      NL_OLLAMA_URL: http://192.168.71.11:11434
+    volumes:
+      - /opt/nationlabs:/opt/nationlabs
+    # lightweight in-container scheduler: runs due follow-ups every 15 min;
+    # business-day + 09:00 GST logic lives in followup.py itself
+    command: >
+      sh -c "while true; do python -m orchestrator.services.followup_runner; sleep 900; done"

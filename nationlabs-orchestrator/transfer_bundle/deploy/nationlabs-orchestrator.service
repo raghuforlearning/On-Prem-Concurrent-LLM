@@ -1,0 +1,16 @@
+[Unit]
+Description=NationLabs AI Presales Orchestrator
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/nationlabs/app
+Environment=NL_RUNTIME_ROOT=/opt/nationlabs
+Environment=NL_OLLAMA_URL=__OLLAMA_URL__
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/nationlabs/python/bin/python3 -m uvicorn orchestrator.web.app:app --host 0.0.0.0 --port 8100
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

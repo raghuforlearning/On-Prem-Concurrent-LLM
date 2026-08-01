@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{% block title %}NationLabs Orchestrator{% endblock %}</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1><a href="/">NationLabs Presales Orchestrator</a></h1>
+  <nav><a href="/intake">+ New Intake</a></nav>
+</header>
+<main>{% block content %}{% endblock %}</main>
+<footer>Air-gapped build · All external comms require human approval</footer>
+</body>
+</html>

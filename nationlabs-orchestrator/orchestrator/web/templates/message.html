@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card"><p>{{ msg }}</p></div>
+{% if opp_id %}<p><a href="/opportunity/{{ opp_id }}">← Back to opportunity</a></p>{% endif %}
+<p><a href="/">← Board</a></p>
+{% endblock %}

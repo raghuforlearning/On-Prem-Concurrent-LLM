@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>New Opportunity Intake</h2>
+<form method="post" action="/intake" enctype="multipart/form-data" class="form">
+  <label>Paste WhatsApp / verbal / notes text
+    <textarea name="pasted_text" rows="10" placeholder="Paste the customer message here..."></textarea>
+  </label>
+  <label>…or upload a file (PDF, image, DOCX, XLSX)
+    <input type="file" name="file">
+  </label>
+  <div class="row">
+    <label>Customer org <input name="customer_org"></label>
+    <label>End user org <input name="end_user_org"></label>
+  </div>
+  <div class="row">
+    <label>Opportunity owner <input name="opportunity_owner"></label>
+    <label>Submission deadline <input name="submission_deadline" type="date"></label>
+  </div>
+  <button type="submit">Create Opportunity</button>
+</form>
+<p class="muted">After creation, open the opportunity and click <b>Run Analysis</b>.
+The AI interpretation is stored separately; the original is never modified.</p>
+{% endblock %}

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>{{ opp["opp_id"] }} — {{ opp["requirement_title"] or "(untitled)" }}</h2>
+<div class="card">
+  <b>Status:</b> <span class="status">{{ opp["status"] }}</span> ·
+  <b>Customer:</b> {{ opp["customer_org"] or "—" }} ·
+  <b>Deadline:</b> {{ opp["submission_deadline"] or "—" }} ·
+  <b>Readiness:</b> {{ opp["readiness_score"] if opp["readiness_score"] is not none else "—" }}
+  ({{ opp["readiness_level"] or "—" }})
+</div>
+
+{% if opp["status"] == "Clarification Required" %}
+<section class="card warn">
+  <h3 style="margin-top:0">🔎 Clarification needed before vendors can be contacted</h3>
+  <p class="muted">The AI found gaps it refuses to guess. Answer what you know
+  (blank = still unknown), then re-run analysis.</p>
+  <form method="post" action="/opportunity/{{ opp['opp_id'] }}/clarify" class="form">
+    <div class="row">
+      <label>Customer org <input name="customer_org" value="{{ opp['customer_org'] or '' }}"></label>
+      <label>End user org <input name="end_user_org" value="{{ opp['end_user_org'] or '' }}"></label>
+    </div>
+    <div class="row">
+      <label>Proposal submission deadline <input name="submission_deadline" type="date"
+             value="{{ opp['submission_deadline'] or '' }}"></label>
+      <label>Notes / answers to AI questions <input name="clarification_note"></label>
+    </div>
+    <button type="submit">Save Answers</button>
+  </form>
+</section>
+{% endif %}
+
+<section>
+  <h3>Actions</h3>
+  <form method="post" action="/opportunity/{{ opp['opp_id'] }}/analyse" class="inline"
+        onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='⏳ Analysing… (LLM call in progress)';">
+    <button>🤖 Run Analysis (extract + classify + readiness)</button>
+  </form>
+  <form method="post" action="/opportunity/{{ opp['opp_id'] }}/draft_rfqs" class="inline"
+        onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='⏳ Matching vendors & drafting…';">
+    <button>✉️ Match Vendors & Draft RFQs</button>
+    <label class="inline">
+      <input type="checkbox" name="disclose_end_user"> approve end-user disclosure (OEM/Distributor only)
+    </label>
+  </form>
+  <form method="post" action="/opportunity/{{ opp['opp_id'] }}/route" class="inline">
+    <button>💰 Route for Approval (>200K → Finance)</button>
+  </form>
+</section>
+
+{% if classification %}
+<section><h3>Classification</h3><pre>{{ classification | tojson(indent=1) }}</pre></section>
+{% endif %}
+{% if extraction %}
+<section><h3>Extraction</h3><pre>{{ extraction | tojson(indent=1) }}</pre></section>
+{% endif %}
+
+<section>
+  <h3>RFQs ({{ rfqs|length }})</h3>
+  {% for r in rfqs %}
+  <div class="card">
+    <b>{{ r["rfq_ref"] }}</b> → {{ r["vendor_name"] }} · status: <span class="status">{{ r["status"] }}</span>
+    · disclose end-user: {{ "YES" if r["disclose_end_user"] else "no" }}
+    <div class="muted">draft: {{ r["draft_path"] }}</div>
+    {% if r["status"] == "AWAITING_APPROVAL" %}
+      <form method="post" action="/rfq/{{ r['id'] }}/approve" class="inline"><button>Approve</button></form>
+    {% endif %}
+    {% if r["status"] in ("APPROVED", "SENT") %}
+      <a href="/rfq/{{ r['id'] }}/respond">📥 Paste vendor response</a>
+    {% endif %}
+  </div>
+  {% endfor %}
+</section>
+
+<section>
+  <h3>Quotes ({{ quotes|length }})</h3>
+  {% for q in quotes %}
+  <div class="card">
+    <b>{{ q["vendor_name"] }}</b> — {{ q["total_after_vat"] or "?" }} {{ q["currency"] }}
+    · status: <span class="status">{{ q["status"] }}</span>
+    <form method="post" action="/quote/{{ q['id'] }}/validate" class="inline">
+      <button>Validate Costing</button>
+    </form>
+  </div>
+  {% endfor %}
+</section>
+
+<section>
+  <h3>Audit Trail (latest 30)</h3>
+  <table>
+  <tr><th>Time</th><th>Actor</th><th>Action</th><th>Value</th><th>Reason</th></tr>
+  {% for t in trail %}
+  <tr><td class="muted">{{ t["ts"] }}</td><td>{{ t["actor"] }}</td><td>{{ t["action"] }}</td>
+      <td>{{ t["new_value"] or "" }}</td><td class="muted">{{ t["reason"] or "" }}</td></tr>
+  {% endfor %}
+  </table>
+</section>
+{% endblock %}

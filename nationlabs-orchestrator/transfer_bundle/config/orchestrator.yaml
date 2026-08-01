@@ -1,0 +1,9 @@
+# NationLabs Orchestrator — air-gapped VM config
+finance_threshold_aed: 200000
+vat_percent: 5.0
+followup_time: "09:00"
+timezone: "Asia/Dubai"
+# Populate with UAE public holidays (ISO dates) each year:
+uae_holidays: []
+# finance_team_email: "finance@nationlabs.ae"
+# presales_manager_email: "presales@nationlabs.ae"
