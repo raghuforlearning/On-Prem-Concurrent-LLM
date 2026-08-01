@@ -36,6 +36,20 @@ def next_business_morning(after: datetime, cfg: Config = CFG) -> datetime:
     return d.replace(hour=hh, minute=mm, second=0, microsecond=0)
 
 
+DEAL_REG_PENDING_STATES = ("Drafted", "Awaiting approval", "Submitted", "Pending",
+                           "Additional information required")
+
+
+def _deal_reg_pending(conn: sqlite3.Connection, rfq) -> str | None:
+    """Returns the pending deal-reg status for this RFQ's opp+vendor, or None."""
+    row = conn.execute(
+        "SELECT status FROM deal_registrations WHERE opp_id=? AND vendor_id=?",
+        (rfq["opp_id"], rfq["vendor_id"])).fetchone()
+    if row and row["status"] in DEAL_REG_PENDING_STATES:
+        return row["status"]
+    return None
+
+
 def _rfq_still_open(conn: sqlite3.Connection, rfq_id: int) -> tuple[bool, str | None]:
     """§15 stop conditions. Returns (open, stop_reason)."""
     rfq = conn.execute("SELECT * FROM rfqs WHERE id=?", (rfq_id,)).fetchone()
@@ -52,6 +66,10 @@ def _rfq_still_open(conn: sqlite3.Connection, rfq_id: int) -> tuple[bool, str | 
         (rfq_id,)).fetchone()
     if resp and resp["response_type"] in ("Commercial quotation", "No-bid",
                                           "Clarification request"):
+        # §13: a quote does NOT close the loop while deal registration is pending —
+        # keep following up for the registration confirmation.
+        if _deal_reg_pending(conn, rfq):
+            return True, None
         return False, f"vendor response received: {resp['response_type']}"
     if not rfq["auto_followup_enabled"]:
         return False, "auto follow-up disabled by owner"
@@ -101,7 +119,8 @@ def run_due_followups(conn: sqlite3.Connection, *, cfg: Config = CFG,
                       action="followup_escalated", new_value=rfq["rfq_ref"])
                 continue
 
-            email = _draft_followup(rfq, vendor, level, cfg)
+            dr_status = _deal_reg_pending(conn, rfq)
+            email = _draft_followup(rfq, vendor, level, cfg, deal_reg_status=dr_status)
             path = cfg.outbox / "vendor_emails" / f"{rfq['rfq_ref']}_followup{level}.txt"
             path.write_text(email, encoding="utf-8")
             conn.execute("UPDATE followups SET status='SENT', sent_at=datetime('now') WHERE id=?",
@@ -117,21 +136,28 @@ def run_due_followups(conn: sqlite3.Connection, *, cfg: Config = CFG,
     return processed
 
 
-def _draft_followup(rfq, vendor, level: int, cfg: Config) -> str:
+def _draft_followup(rfq, vendor, level: int, cfg: Config,
+                    deal_reg_status: str | None = None) -> str:
+    dr_line = (f"\nIMPORTANT: deal registration is still '{deal_reg_status}'. "
+               "Prominently ask for the deal-registration confirmation/reference as well."
+               if deal_reg_status else "")
     try:
         return call_llm(
             "fast", FOLLOWUP_SYSTEM,
             f"RFQ ref: {rfq['rfq_ref']}\nVendor: {vendor['vendor_name']} <{vendor['email']}>\n"
             f"Original RFQ sent: {rfq['sent_at']}\nEscalation level: {level} of "
-            f"{cfg.followup_max_before_escalation}\nDraft the follow-up email.",
+            f"{cfg.followup_max_before_escalation}{dr_line}\nDraft the follow-up email.",
             num_ctx=2048, cfg=cfg,
         )
     except Exception as e:  # LLM down → deterministic template fallback
         log.warning("LLM follow-up draft failed (%s); using template", e)
+        dr_text = (f"We are also still awaiting confirmation of the deal registration "
+                   f"(currently '{deal_reg_status}'). Kindly share the registration reference.\n"
+                   if deal_reg_status else "")
         return (f"To: {vendor['email']}\nSubject: Follow-Up: RFQ {rfq['rfq_ref']} | NationLabs\n\n"
                 f"Dear {vendor['vendor_name']} Team,\n\n"
                 f"Following up on our RFQ {rfq['rfq_ref']} sent on {rfq['sent_at']}.\n"
-                f"Kindly confirm receipt and share your expected response timeline.\n\n"
+                f"Kindly confirm receipt and share your expected response timeline.\n{dr_text}\n"
                 f"Best regards,\nNationLabs Procurement\n")
 
 

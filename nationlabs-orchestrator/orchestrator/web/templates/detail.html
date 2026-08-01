@@ -44,8 +44,31 @@
   </form>
   <form method="post" action="/opportunity/{{ opp['opp_id'] }}/route" class="inline">
     <button>💰 Route for Approval (>200K → Finance)</button>
+    <label class="inline" title="Routing is blocked until the selected vendor's deal registration is Approved">
+      <input type="checkbox" name="deal_reg_override"> override deal-registration gate
+    </label>
+    <input name="override_reason" placeholder="override reason (required for audit)" size="28">
   </form>
 </section>
+
+{% if deal_regs %}
+<section>
+  <h3>🛡️ Deal Registrations ({{ deal_regs|length }})</h3>
+  {% for d in deal_regs %}
+  <div class="card{% if d['status'] not in ('Approved','Not required') %} warn{% endif %}">
+    <b>{{ d["vendor_name"] }}</b> — status:
+    <span class="status">{{ d["status"] }}</span>
+    {% if d["reg_reference"] %} · ref: {{ d["reg_reference"] }}{% endif %}
+    {% if d["price_protection_validity"] %} · price protection: {{ d["price_protection_validity"] }}{% endif %}
+    <div class="muted">updated: {{ d["updated_at"] }}
+      {% if d["status"] not in ("Approved","Not required") %}
+        — ⚠️ proposal routing is BLOCKED until this is Approved
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
 
 {% if classification %}
 <section><h3>Classification</h3><pre>{{ classification | tojson(indent=1) }}</pre></section>
@@ -63,6 +86,9 @@
     <div class="muted">draft: {{ r["draft_path"] }}</div>
     {% if r["status"] == "AWAITING_APPROVAL" %}
       <form method="post" action="/rfq/{{ r['id'] }}/approve" class="inline"><button>Approve</button></form>
+    {% endif %}
+    {% if r["status"] == "APPROVED" %}
+      <form method="post" action="/rfq/{{ r['id'] }}/confirm_sent" class="inline"><button>✅ Confirm Sent</button></form>
     {% endif %}
     {% if r["status"] in ("APPROVED", "SENT") %}
       <a href="/rfq/{{ r['id'] }}/respond">📥 Paste vendor response</a>

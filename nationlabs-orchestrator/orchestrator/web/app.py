@@ -115,10 +115,14 @@ def detail(request: Request, opp_id: str):
     trail = conn.execute(
         "SELECT ts, actor, action, new_value, reason FROM audit_log WHERE opp_id=? ORDER BY id DESC LIMIT 30",
         (opp_id,)).fetchall()
+    deal_regs = conn.execute(
+        """SELECT d.*, v.vendor_name FROM deal_registrations d
+           JOIN vendors v ON v.id=d.vendor_id WHERE d.opp_id=? ORDER BY d.updated_at DESC""",
+        (opp_id,)).fetchall()
     return templates.TemplateResponse(request, "detail.html", {"opp": opp,
         "extraction": json.loads(opp["extraction_json"] or "null"),
         "classification": json.loads(opp["classification_json"] or "null"),
-        "rfqs": rfqs, "quotes": quotes, "trail": trail})
+        "rfqs": rfqs, "quotes": quotes, "trail": trail, "deal_regs": deal_regs})
 
 
 @app.post("/opportunity/{opp_id}/analyse")
@@ -245,10 +249,14 @@ def validate(request: Request, quote_id: int):
 
 
 @app.post("/opportunity/{opp_id}/route")
-def route(request: Request, opp_id: str):
+async def route(request: Request, opp_id: str):
     conn = db()
+    form = await request.form()
     try:
-        dest = costing.route_for_approval(conn, opp_id, actor=actor(request))
+        dest = costing.route_for_approval(
+            conn, opp_id, actor=actor(request),
+            deal_reg_override=form.get("deal_reg_override") == "on",
+            override_reason=form.get("override_reason"))
         msg = f"routed to: {dest}"
     except ValueError as e:
         msg = str(e)

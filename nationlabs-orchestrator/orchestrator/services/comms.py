@@ -125,15 +125,29 @@ def approve_rfq(conn: sqlite3.Connection, rfq_id: int, *, approver: str,
 
 def confirm_rfq_sent(conn: sqlite3.Connection, rfq_id: int, *, actor: str,
                      response_deadline: str | None = None, cfg: Config = CFG) -> None:
-    """Called after a HUMAN actually dispatches the file. Schedules follow-up #1."""
+    """Called after a HUMAN actually dispatches the file. Schedules follow-up #1
+    and opens the deal-registration tracker (§13) for this vendor."""
     rfq = conn.execute("SELECT * FROM rfqs WHERE id=?", (rfq_id,)).fetchone()
     if rfq is None or rfq["status"] != "APPROVED":
         raise ValueError("RFQ must be APPROVED before send-confirmation")
+    vendor = conn.execute("SELECT deal_reg_capable, vendor_name FROM vendors WHERE id=?",
+                          (rfq["vendor_id"],)).fetchone()
     with conn:
         conn.execute("UPDATE rfqs SET status='SENT', sent_at=datetime('now'), response_deadline=? WHERE id=?",
                      (response_deadline, rfq_id))
         audit(conn, opp_id=rfq["opp_id"], actor=actor, component="comms",
               action="rfq_sent_confirmed", new_value=rfq["rfq_ref"])
+        # §13: deal registration tracking starts AT SEND, not at vendor response
+        dr_status = "Submitted" if vendor["deal_reg_capable"] else "Not required"
+        conn.execute(
+            """INSERT INTO deal_registrations (opp_id, vendor_id, status, updated_at)
+               VALUES (?,?,?, datetime('now'))
+               ON CONFLICT(opp_id, vendor_id) DO NOTHING""",
+            (rfq["opp_id"], rfq["vendor_id"], dr_status),
+        )
+        audit(conn, opp_id=rfq["opp_id"], actor="system", component="comms",
+              action="deal_reg_requested", new_value=dr_status,
+              reason=f"vendor={vendor['vendor_name']}; requested with {rfq['rfq_ref']}")
         from .followup import schedule_initial_followup
         schedule_initial_followup(conn, rfq_id, cfg)
         opp = conn.execute("SELECT status FROM opportunities WHERE opp_id=?",

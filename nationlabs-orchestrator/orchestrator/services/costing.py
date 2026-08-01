@@ -150,14 +150,20 @@ def validate_quote(conn: sqlite3.Connection, quote_id: int, *,
 
 
 def route_for_approval(conn: sqlite3.Connection, opp_id: str, *,
-                       actor: str = "system", cfg: Config = CFG) -> str:
-    """§22 routing. Returns 'FINANCE' or 'FINAL_VERIFIER'. Deterministic."""
+                       actor: str = "system", cfg: Config = CFG,
+                       deal_reg_override: bool = False,
+                       override_reason: str | None = None) -> str:
+    """§22 routing. Returns 'FINANCE' or 'FINAL_VERIFIER'. Deterministic.
+    §13 gate: the selected vendor's deal registration must be Approved (or Not
+    required) before a proposal can be routed — price protection depends on it.
+    A human may override with a reason; the override is audit-logged."""
     opp = conn.execute("SELECT * FROM opportunities WHERE opp_id=?", (opp_id,)).fetchone()
     if opp is None:
         raise KeyError(opp_id)
 
     quotes = conn.execute(
-        """SELECT q.*, v.vendor_name FROM quotes q JOIN vendors v ON v.id=q.vendor_id
+        """SELECT q.*, v.vendor_name, v.deal_reg_capable FROM quotes q
+           JOIN vendors v ON v.id=q.vendor_id
            WHERE q.opp_id=? AND q.status IN ('Complete','Complete with assumptions')
            ORDER BY q.total_after_vat ASC""", (opp_id,)).fetchall()
     if len(quotes) < cfg.quotes_required_for_proposal:
@@ -167,6 +173,25 @@ def route_for_approval(conn: sqlite3.Connection, opp_id: str, *,
     selected = quotes[0]  # lowest compliant quote (commercial evaluation is human;
                           # system pre-selects lowest for the approval packet)
     total = selected["total_after_vat"] or 0.0
+
+    # §13 deal-registration gate
+    dr = conn.execute(
+        "SELECT status FROM deal_registrations WHERE opp_id=? AND vendor_id=?",
+        (opp_id, selected["vendor_id"])).fetchone()
+    dr_status = dr["status"] if dr else ("Not required" if not selected["deal_reg_capable"]
+                                         else "Not submitted")
+    if selected["deal_reg_capable"] and dr_status not in ("Approved", "Not required"):
+        if not deal_reg_override:
+            raise ValueError(
+                f"DEAL REGISTRATION NOT SECURED for {selected['vendor_name']} "
+                f"(status: {dr_status}). Routing blocked — proceeding without an approved "
+                "registration loses price protection. Confirm the registration first, "
+                "or override explicitly with a reason.")
+        with conn:
+            audit(conn, opp_id=opp_id, actor=actor, component="costing",
+                  action="DEAL_REG_OVERRIDE",
+                  new_value=f"{selected['vendor_name']} status={dr_status}",
+                  reason=override_reason or "no reason given")
 
     # §22.3 additional triggers (MVP subset): any WARN/FAIL on costing → extra scrutiny flag
     warn_count = conn.execute(
@@ -187,7 +212,8 @@ def route_for_approval(conn: sqlite3.Connection, opp_id: str, *,
         audit(conn, opp_id=opp_id, actor=actor, component="costing",
               action="approval_routed", new_value=route,
               reason=f"total={total:.2f} AED vs threshold {cfg.finance_threshold_aed}; "
-                     f"selected={selected['vendor_name']}; open_check_flags={warn_count}")
+                     f"selected={selected['vendor_name']}; open_check_flags={warn_count}; "
+                     f"deal_reg={dr_status}")
         if opp["status"] == "Ready for Proposal":
             transition(conn, opp_id,
                        "Finance Approval Required" if route == "FINANCE" else "Final Verification",
@@ -200,6 +226,7 @@ def route_for_approval(conn: sqlite3.Connection, opp_id: str, *,
         f"Opportunity: {opp_id} | {opp['requirement_title']}\n"
         f"Customer: {opp['customer_org']}\n"
         f"Selected quote: {selected['vendor_name']} — {total:,.2f} {selected['currency']}\n"
+        f"Deal registration: {dr_status}\n"
         f"Deadline: {opp['submission_deadline']}\n"
         f"Open validation flags: {warn_count}\n"
         f"ACTION: review costing sheet and approve/reject.\n", encoding="utf-8")

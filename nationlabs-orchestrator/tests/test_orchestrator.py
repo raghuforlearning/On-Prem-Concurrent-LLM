@@ -90,7 +90,7 @@ def test_ambiguous_classification_halts(conn):
 
 
 # ---- 3. 200K AED routing boundary ----
-def _mk_quote(conn, opp_id, vendor_id, total, ref):
+def _mk_quote(conn, opp_id, vendor_id, total, ref, deal_reg="Approved"):
     data = {"quote_ref": ref, "currency": "AED", "quote_expiry": "2027-01-01",
             "line_items": [{"description": "X", "quantity": 1, "unit_price": total,
                             "line_total": total}],
@@ -100,6 +100,10 @@ def _mk_quote(conn, opp_id, vendor_id, total, ref):
         """INSERT INTO quotes (opp_id, vendor_id, quote_ref, currency, total_after_vat,
            extracted_json, status) VALUES (?,?,?,?,?,?,'Complete')""",
         (opp_id, vendor_id, ref, "AED", total, json.dumps(data)))
+    conn.execute(
+        """INSERT INTO deal_registrations (opp_id, vendor_id, status) VALUES (?,?,?)
+           ON CONFLICT(opp_id, vendor_id) DO UPDATE SET status=excluded.status""",
+        (opp_id, vendor_id, deal_reg))
     return cur.lastrowid
 
 
@@ -189,3 +193,76 @@ def test_blocked_contacts_never_selected(conn):
     cands = vendor.match_vendors(conn, "NL-OPP-2026-0001", ["Networking"])
     names = [c.vendor_name for c in cands]
     assert "TestOEM" not in names and "TestReseller" in names
+
+
+# ---- 7. §13 Deal registration: tracking starts at send ----
+def test_deal_reg_tracking_created_at_send(conn, monkeypatch):
+    monkeypatch.setattr(comms, "call_llm", lambda *a, **kw: "email text")
+    oem = VendorCandidate(1, "TestOEM", "OEM", "Sales", "sales@oem.ae",
+                          "ACCOUNT_MANAGER", True, True)
+    rfq_id = comms.create_rfq_draft(conn, "NL-OPP-2026-0001", oem,
+                                    end_user_disclosure_approved=False, actor="test")
+    comms.approve_rfq(conn, rfq_id, approver="owner")
+    comms.confirm_rfq_sent(conn, rfq_id, actor="owner")
+    dr = conn.execute(
+        "SELECT status FROM deal_registrations WHERE opp_id='NL-OPP-2026-0001' AND vendor_id=1"
+    ).fetchone()
+    assert dr["status"] == "Submitted"  # tracking opens AT SEND, not at vendor response
+
+
+def test_deal_reg_not_required_for_non_capable_vendor(conn, monkeypatch):
+    monkeypatch.setattr(comms, "call_llm", lambda *a, **kw: "email text")
+    reseller = VendorCandidate(2, "TestReseller", "RESELLER", "Guy", "guy@reseller.ae",
+                               "SALES", False, False)
+    rfq_id = comms.create_rfq_draft(conn, "NL-OPP-2026-0001", reseller,
+                                    end_user_disclosure_approved=False, actor="test")
+    comms.approve_rfq(conn, rfq_id, approver="owner")
+    comms.confirm_rfq_sent(conn, rfq_id, actor="owner")
+    dr = conn.execute(
+        "SELECT status FROM deal_registrations WHERE opp_id='NL-OPP-2026-0001' AND vendor_id=2"
+    ).fetchone()
+    assert dr["status"] == "Not required"
+
+
+# ---- 8. §13 Deal registration: proposal gate ----
+def test_routing_blocked_until_deal_reg_approved(conn):
+    conn.execute("UPDATE opportunities SET status='Ready for Proposal' WHERE opp_id='NL-OPP-2026-0001'")
+    _mk_quote(conn, "NL-OPP-2026-0001", 1, 150_000, "Q1", deal_reg="Submitted")
+    _mk_quote(conn, "NL-OPP-2026-0001", 2, 160_000, "Q2", deal_reg="Not required")
+    with pytest.raises(ValueError, match="DEAL REGISTRATION NOT SECURED"):
+        costing.route_for_approval(conn, "NL-OPP-2026-0001")
+
+
+def test_routing_override_is_audited(conn):
+    conn.execute("UPDATE opportunities SET status='Ready for Proposal' WHERE opp_id='NL-OPP-2026-0001'")
+    _mk_quote(conn, "NL-OPP-2026-0001", 1, 150_000, "Q1", deal_reg="Pending")
+    _mk_quote(conn, "NL-OPP-2026-0001", 2, 160_000, "Q2", deal_reg="Not required")
+    dest = costing.route_for_approval(conn, "NL-OPP-2026-0001",
+                                      deal_reg_override=True,
+                                      override_reason="vendor confirmed by phone; ref pending")
+    assert dest == "FINAL_VERIFIER"
+    row = conn.execute("SELECT reason FROM audit_log WHERE action='DEAL_REG_OVERRIDE'").fetchone()
+    assert row is not None and "phone" in row["reason"]
+
+
+# ---- 9. §13 Follow-up keeps chasing a pending registration even after a quote ----
+def test_followup_continues_while_deal_reg_pending(conn, monkeypatch):
+    captured = {}
+    monkeypatch.setattr(followup, "call_llm",
+                        lambda r, s, u, **kw: captured.update(p=u) or "follow-up email")
+    conn.execute("UPDATE opportunities SET status='Awaiting Vendor Response' WHERE opp_id='NL-OPP-2026-0001'")
+    conn.execute("""INSERT INTO rfqs (opp_id, vendor_id, rfq_ref, status, sent_at)
+                    VALUES ('NL-OPP-2026-0001',1,'NL-RFQ-2026-0001','SENT','2026-07-20')""")
+    rid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    conn.execute("""INSERT INTO vendor_responses (rfq_id, response_type, raw_path)
+                    VALUES (?,'Commercial quotation','x.txt')""", (rid,))
+    conn.execute("""INSERT INTO deal_registrations (opp_id, vendor_id, status)
+                    VALUES ('NL-OPP-2026-0001',1,'Submitted')""")
+    conn.execute("INSERT INTO followups (rfq_id, followup_n, scheduled_at) VALUES (?,?,?)",
+                 (rid, 1, "2026-07-21"))
+    conn.commit()
+    from datetime import datetime, timedelta
+    now = datetime.now(followup.TZ) + timedelta(days=30)
+    processed = followup.run_due_followups(conn, now=now)
+    assert processed, "follow-up must continue while deal registration is pending"
+    assert "deal registration" in captured["p"].lower()
