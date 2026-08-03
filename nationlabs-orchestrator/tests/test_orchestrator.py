@@ -266,3 +266,32 @@ def test_followup_continues_while_deal_reg_pending(conn, monkeypatch):
     processed = followup.run_due_followups(conn, now=now)
     assert processed, "follow-up must continue while deal registration is pending"
     assert "deal registration" in captured["p"].lower()
+
+
+# ---- 10. §13 Deal-reg confirmation must PERSIST (commit regression) ----
+def test_deal_reg_confirmation_persists(conn):
+    """Bug 2026-08-03: _update_deal_reg ran outside any transaction and its
+    INSERT was silently rolled back. Row + audit must survive."""
+    from orchestrator.services import responses as resp_mod
+    conn.execute("""INSERT INTO rfqs (opp_id, vendor_id, rfq_ref, status, sent_at)
+                    VALUES ('NL-OPP-2026-0001',1,'NL-RFQ-2026-0009','SENT','2026-08-01')""")
+    conn.commit()
+    resp_mod._update_deal_reg(conn, "NL-OPP-2026-0001", 1,
+                              "Deal-registration confirmation", "NL-RFQ-2026-0009")
+    # read back through a FRESH cursor/connection view (post-commit visibility)
+    row = conn.execute(
+        "SELECT status FROM deal_registrations WHERE opp_id='NL-OPP-2026-0001' AND vendor_id=1"
+    ).fetchone()
+    assert row is not None and row["status"] == "Approved"
+    log = conn.execute("SELECT 1 FROM audit_log WHERE action='deal_reg_updated'").fetchone()
+    assert log is not None
+
+
+# ---- 11. §13 Override without a reason is refused ----
+def test_override_requires_reason(conn):
+    conn.execute("UPDATE opportunities SET status='Ready for Proposal' WHERE opp_id='NL-OPP-2026-0001'")
+    _mk_quote(conn, "NL-OPP-2026-0001", 1, 150_000, "Q1", deal_reg="Pending")
+    _mk_quote(conn, "NL-OPP-2026-0001", 2, 160_000, "Q2", deal_reg="Not required")
+    with pytest.raises(ValueError, match="requires a written reason"):
+        costing.route_for_approval(conn, "NL-OPP-2026-0001",
+                                   deal_reg_override=True, override_reason="  ")

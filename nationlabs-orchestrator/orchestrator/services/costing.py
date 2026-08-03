@@ -187,6 +187,10 @@ def route_for_approval(conn: sqlite3.Connection, opp_id: str, *,
                 f"(status: {dr_status}). Routing blocked — proceeding without an approved "
                 "registration loses price protection. Confirm the registration first, "
                 "or override explicitly with a reason.")
+        if not (override_reason and override_reason.strip()):
+            raise ValueError(
+                "Deal-registration override requires a written reason — "
+                "it becomes part of the permanent audit record.")
         with conn:
             audit(conn, opp_id=opp_id, actor=actor, component="costing",
                   action="DEAL_REG_OVERRIDE",

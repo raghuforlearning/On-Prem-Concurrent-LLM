@@ -130,15 +130,16 @@ def _extract_and_store_quote(conn, rfq, response_id: int, text: str, cfg: Config
 
 def _update_deal_reg(conn, opp_id: str, vendor_id: int, rtype: str, ref: str) -> None:
     status = "Approved" if "confirmation" in rtype else "Rejected"
-    conn.execute(
-        """INSERT INTO deal_registrations (opp_id, vendor_id, status, updated_at)
-           VALUES (?,?,?, datetime('now'))
-           ON CONFLICT(opp_id, vendor_id) DO UPDATE SET status=excluded.status,
-           updated_at=datetime('now')""",
-        (opp_id, vendor_id, status),
-    )
-    audit(conn, opp_id=opp_id, actor="system", component="responses",
-          action="deal_reg_updated", new_value=status, source=ref)
+    with conn:  # runs outside the caller's transaction — must commit its own work
+        conn.execute(
+            """INSERT INTO deal_registrations (opp_id, vendor_id, status, updated_at)
+               VALUES (?,?,?, datetime('now'))
+               ON CONFLICT(opp_id, vendor_id) DO UPDATE SET status=excluded.status,
+               updated_at=datetime('now')""",
+            (opp_id, vendor_id, status),
+        )
+        audit(conn, opp_id=opp_id, actor="system", component="responses",
+              action="deal_reg_updated", new_value=status, source=ref)
 
 
 def _write_internal_alert(conn, rfq, classification: dict, text: str,
