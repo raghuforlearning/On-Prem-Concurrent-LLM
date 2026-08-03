@@ -224,10 +224,11 @@ CREATE INDEX IF NOT EXISTS idx_followups_due ON followups(status, scheduled_at);
 
 
 def get_db(db_path: str | Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(str(db_path))
+    conn = sqlite3.connect(str(db_path), timeout=10)  # wait out brief writer locks
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA busy_timeout = 10000")  # web + CLI share one file
     return conn
 
 
