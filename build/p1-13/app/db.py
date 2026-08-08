@@ -37,6 +37,10 @@ CREATE TABLE IF NOT EXISTS token_metrics (
     latency_ms  INT,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- P1-13b: file-intake provenance columns (additive migration)
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS extraction_method TEXT;
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS original_path TEXT;
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS original_filename TEXT;
 """
 
 

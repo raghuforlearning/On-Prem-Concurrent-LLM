@@ -11,6 +11,8 @@ services:
       - "8080:8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      - rfp-archive:/srv/data/rfp_archive   # originals preserved byte-for-byte
     environment:
       PG_DSN: postgresql://orchestrator_app:${PG_APP_PASSWORD}@host.docker.internal:5432/orchestrator
       OLLAMA_URL: http://host.docker.internal:11434
@@ -20,3 +22,6 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+
+volumes:
+  rfp-archive:

@@ -64,6 +64,9 @@
       <h3>New RFP Intake</h3>
       <textarea id="rfpText" placeholder="Paste WhatsApp message / RFP text here…"></textarea>
       <button onclick="submitRfp()">Create &amp; Analyze</button>
+      <div class="muted" style="margin:8px 0">— or upload a file —</div>
+      <input type="file" id="rfpFile" accept=".png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.pdf,.docx,.xlsx,.csv,.txt,.md">
+      <button onclick="uploadRfp()">Upload &amp; Analyze</button>
       <div id="intakeMsg" class="muted"></div>
     </div>
     <div id="oppList"></div>
@@ -116,6 +119,21 @@ async function submitRfp() {
   const r = await post('/opportunities', {raw_text, source_channel:'whatsapp'});
   document.getElementById('intakeMsg').textContent = r.opp_id ? `${r.opp_id} → ${r.status}` : JSON.stringify(r);
   document.getElementById('rfpText').value = '';
+  await refreshOpps();
+  if (r.opp_id) selectOpp(r.opp_id);
+}
+
+async function uploadRfp() {
+  const f = document.getElementById('rfpFile').files[0];
+  if (!f) return;
+  document.getElementById('intakeMsg').textContent = `Extracting ${f.name} (OCR/PDF may take a moment) + analyzing…`;
+  const fd = new FormData();
+  fd.append('file', f);
+  const r = await fetch('/opportunities/upload', {method:'POST', body: fd}).then(r=>r.json());
+  document.getElementById('intakeMsg').textContent = r.opp_id
+    ? `${r.opp_id} → ${r.status} (${r.extraction_method}, ${r.chars} chars)`
+    : (r.detail || JSON.stringify(r));
+  document.getElementById('rfpFile').value = '';
   await refreshOpps();
   if (r.opp_id) selectOpp(r.opp_id);
 }

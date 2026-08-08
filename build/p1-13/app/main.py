@@ -102,6 +102,43 @@ def create_opportunity(body: IntakeIn):
     return {"opp_id": opp_id, "status": result["status"]}
 
 
+from fastapi import UploadFile, File
+import intake_files
+from pathlib import Path
+
+ARCHIVE = Path("/srv/data/rfp_archive")
+
+
+@app.post("/opportunities/upload")
+async def upload_opportunity(file: UploadFile = File(...)):
+    """File intake: PDF / XLSX / CSV / DOCX / image / txt. Original preserved
+    byte-for-byte + hashed; extracted text flows into the same workflow."""
+    suffix = Path(file.filename).suffix.lower()
+    if suffix not in intake_files.SUPPORTED:
+        raise HTTPException(400, f"unsupported type {suffix}; allowed: {sorted(intake_files.SUPPORTED)}")
+    data = await file.read()
+    digest = intake_files.sha256_bytes(data)
+    opp_dir = ARCHIVE / digest[:16]
+    opp_dir.mkdir(parents=True, exist_ok=True)
+    original = opp_dir / f"original{suffix}"
+    original.write_bytes(data)
+    try:
+        text, method = intake_files.extract_text(original)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    with psycopg.connect(PG_DSN) as conn:
+        opp_id = workflow.intake(text, f"upload:{suffix}", conn,
+                                 extraction_method=method,
+                                 original_path=str(original),
+                                 original_filename=file.filename)
+    try:
+        result = workflow.run_workflow(opp_id)
+    except Exception as e:
+        raise HTTPException(502, f"workflow failed: {e}")
+    return {"opp_id": opp_id, "status": result["status"],
+            "extraction_method": method, "sha256": digest, "chars": len(text)}
+
+
 @app.get("/opportunities/{opp_id}")
 def get_opportunity(opp_id: str):
     with psycopg.connect(PG_DSN) as conn:

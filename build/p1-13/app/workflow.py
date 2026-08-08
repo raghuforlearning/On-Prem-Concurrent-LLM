@@ -138,14 +138,19 @@ def run_workflow(opp_id: str) -> dict:
                             config={"configurable": {"thread_id": opp_id}})
 
 
-def intake(raw_text: str, source_channel: str, conn) -> str:
+def intake(raw_text: str, source_channel: str, conn,
+           extraction_method: str = None, original_path: str = None,
+           original_filename: str = None) -> str:
     from db import next_opp_id
     opp_id = next_opp_id(conn)
     digest = hashlib.sha256(raw_text.encode()).hexdigest()
     conn.execute(
-        "INSERT INTO opportunities (opp_id, status, source_channel, raw_text, raw_sha256) "
-        "VALUES (%s,'INTAKE',%s,%s,%s)", (opp_id, source_channel, raw_text, digest))
-    audit(conn, "api.user", "workflow", "opportunity_created", opp_id, new=source_channel)
+        "INSERT INTO opportunities (opp_id, status, source_channel, raw_text, raw_sha256, "
+        "extraction_method, original_path, original_filename) "
+        "VALUES (%s,'INTAKE',%s,%s,%s,%s,%s,%s)",
+        (opp_id, source_channel, raw_text, digest, extraction_method, original_path, original_filename))
+    audit(conn, "api.user", "workflow", "opportunity_created", opp_id,
+          new=source_channel, reason=f"method={extraction_method}" if extraction_method else None)
     conn.commit()
     return opp_id
 
