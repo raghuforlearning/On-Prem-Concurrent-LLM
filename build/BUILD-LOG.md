@@ -60,9 +60,33 @@ PostgreSQL stays **native/systemd** (owns PITR cron + audit schema — container
 - **I-06 (root cause of boot race):** first reboot showed Postgres bound only `127.0.0.1` — it started before Docker created the `172.17.0.1` bridge and silently bound what it could. Fixed with systemd drop-in `/etc/systemd/system/postgresql@16-main.service.d/after-docker.conf` (`After=docker.service`).
 - **Reboot-survival test: ✅ PASSED (2nd reboot)** — 43 s after boot: all 8 containers up (nl-api healthy, nl-worker, ollama, guardrails ×2, grafana, loki, open-webui), healthz `"status":"ok"`, zero manual intervention. Criterion ≤3 min — beat by 4×.
 
+**P1-07 — Real LangGraph workflow — ✅ PASSED (08-Aug-2026)**
+
+### Built (`build/p1-07/app/`, commits 9add26d/eedc2c3)
+
+- `prompts.py` — merged extraction+classification single-call prompt (reused from prototype's proven v1 prompts, per v2.0 §10)
+- `workflow.py` — LangGraph: intake → analyze (qwen3:14b, format=JSON schema, temp 0) → deterministic readiness gate (weighted fields, threshold 65) → READY | CLARIFICATION_REQUIRED; clarification loop merges human answers and re-scores
+- `db.py` — opportunities/clarifications/token_metrics DDL; `main.py` — REST endpoints
+- Idempotency guard: analyze_node skips LLM if extraction exists → zero duplicate side-effects on resume
+
+### Acceptance evidence (live, on aiinference)
+
+| Test | Result |
+|---|---|
+| Complete RFP (ADNOC/Fortinet) | `NL-OPP-2026-0001` → READY, readiness 75, CP + Network security, correct extraction ✅ |
+| Vague RFP (laptops) | `NL-OPP-2026-0002` → **CLARIFICATION_REQUIRED**, readiness 0, `needs_human_decision=true`, 9 questions generated — system halted instead of guessing ✅ |
+| Clarification loop | Answers merged → READY (90) ✅ |
+| Idempotent resume | `llm_calls_total = 2` after graph ran 3× — **no duplicate LLM call** ✅ |
+| Token metrics | 845→197 tok cold (48.8s incl. model load); **789→114 tok, 3.3s warm** — steady-state intake latency ✅ |
+
+### Observations logged for P1-23 benchmark
+
+- Model missed explicit "submit proposal by Aug 20" deadline in 0001 (extraction recall gap on deadline phrasing) — flow still correct; becomes a benchmark test case.
+- Worker service retired (graph runs in API process); dedicated worker returns in P1-10 (follow-up scheduler).
+
 ### Next task
 
-**P1-07 — LangGraph real workflow: intake → extract+classify → readiness gate → clarification loop** (P1-04/05/06 housekeeping folded in as time allows).
+**P1-09 — Deal-registration gate + idempotent RFQ drafting** (highest business value per your deal-reg emphasis; P1-08 vendor service needed first — real vendor Excel still an owner input).
 
 **P1-02 — PostgreSQL 16 + pgvector + PITR + audit schema — ✅ PASSED (08-Aug-2026)**
 
