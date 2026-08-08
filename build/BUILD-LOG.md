@@ -57,7 +57,8 @@ PostgreSQL stays **native/systemd** (owns PITR cron + audit schema — container
 
 - **I-04:** `.env` placeholder pasted literally (twice) → password reset to URL-safe build password `NlOrch2026SecurePassX9`. ⚠️ **Security task logged: rotate before production** (password has appeared in chat).
 - **I-05:** pg_hba rejected containers: Compose network is `172.19.0.x`, not default bridge `172.17.0.0/16`. Widened to `172.16.0.0/12` scoped to orchestrator_app+orchestrator DB only. `listen_addresses` = localhost + Docker bridge.
-- Reboot-survival test: pending final reboot check by Raghu.
+- **I-06 (root cause of boot race):** first reboot showed Postgres bound only `127.0.0.1` — it started before Docker created the `172.17.0.1` bridge and silently bound what it could. Fixed with systemd drop-in `/etc/systemd/system/postgresql@16-main.service.d/after-docker.conf` (`After=docker.service`).
+- **Reboot-survival test: ✅ PASSED (2nd reboot)** — 43 s after boot: all 8 containers up (nl-api healthy, nl-worker, ollama, guardrails ×2, grafana, loki, open-webui), healthz `"status":"ok"`, zero manual intervention. Criterion ≤3 min — beat by 4×.
 
 ### Next task
 
