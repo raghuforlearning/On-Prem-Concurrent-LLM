@@ -37,7 +37,33 @@ Planned ≥48 GiB (v2.0 band 56–72) → delivered 36 GB static. **Reason:** ho
 
 **P1-02 — PostgreSQL 16 + pgvector, PITR backup, append-only hash-chained audit schema.** Waiting on go-ahead.
 
-**Status: P1-01 CLOSED. Ready for P1-02 on your go-ahead.**
+**P1-02 — PostgreSQL 16 + pgvector + PITR + audit schema — ✅ PASSED (08-Aug-2026)**
+
+### What was installed (guided mode, executed by Raghu on aiinference VM)
+
+| Component | Detail | Verification |
+|---|---|---|
+| PostgreSQL 16 | 16.14 via PGDG official repo (`apt.postgresql.org`); VM had a controlled internet window — no USB bundle needed | `pg_lsclusters`: 16/main online :5432 ✅ |
+| pgvector | 0.8.6, extension enabled inside `orchestrator` DB | `\dx`: vector 0.8.6 ✅ |
+| App role + DB | `orchestrator_app` (least privilege) owns `orchestrator` DB | `\du` ✅ (password recorded by Raghu — needed in P1-03) |
+| WAL archiving | `archive_mode=on`, archive→`/var/lib/postgresql/wal_archive`, `archive_timeout=1h` | Segments 0001–0005 archived ✅ |
+| Append-only hash-chained audit | `audit_log` + triggers: UPDATE/DELETE rejected; SHA-256 chain via pgcrypto; script at `build/p1-02/audit_schema.sql` | Forgery attempt → `ERROR: audit_log is append-only` (both ops) ✅ |
+| PITR | Base backup + WAL replay to `2026-08-08 08:41:22+00` in scratch cluster | Recovered 2 rows, "disaster" row correctly absent ✅ |
+| Automated backups | cron (postgres user): daily 02:17 `pg_basebackup`, 7-day retention | `crontab -l` verified ✅ |
+
+### Issues hit & resolved (learning value logged)
+
+- **I-02:** First PITR drill failed: `recovery ended before configured recovery target was reached` — target WAL segment still open in live DB. Fixed by `pg_switch_wal()`; lesson made permanent via `archive_timeout=1h`. Rule: recovery floor = last *archived* segment.
+- **I-03:** Data page checksums OFF (initdb default). Enabling requires cluster re-init — deferred to pre-production hardening list (owner: pre-go-live).
+
+### Open items carried
+
+- VM-side local git repo for configs/SQL (air-gap-safe VCS) — next SSH session.
+- Off-box backup copy (same-disk archive ≠ full DR) — production DR decision with Niren (D6/DR).
+
+### Next task
+
+**P1-03 — Docker Compose MVP stack: FastAPI + PostgreSQL + Ollama + LangGraph workers, health checks, reboot persistence.**
 
 ---
 
