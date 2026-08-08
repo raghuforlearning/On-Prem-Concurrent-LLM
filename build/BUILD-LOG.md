@@ -154,9 +154,25 @@ PostgreSQL stays **native/systemd** (owns PITR cron + audit schema — container
 - My initial T3 scenario was mis-specified (broke AM-R3's range instead of creating a gap) — caught, corrected, and it surfaced the gap-refusal feature as a bonus acceptance test. Matrix restored to clean provisional state.
 - **Owner input still needed:** signed AM-1 worksheet → flip `source` to SIGNED-AM1 (Niren/Finance).
 
-### Next task
+**P1-13 — Human-in-loop review UI + file intake — ✅ PASSED (08-Aug-2026)**
 
-**P1-13 — Human-in-loop review UI** (extraction corrections, approval inbox, RFQ/deal-reg board — the Niren-visible surface).
+### Built (`build/p1-13/app/`, commits bea20d3/97cb6f6/5783d34)
+
+- `static/index.html` — three-column review board (vanilla JS, zero build chain): intake (paste text **or upload file**) · opportunity pipeline · extraction/classification view · inline clarification answering · RFQ/deal-reg board with gated buttons (Approve Deal Reg / Approve Disclosure / Send) · approvals inbox · alerts feed · LLM token meter
+- `intake_files.py` — PDF (pdfplumber + tesseract fallback for scans) / XLSX / CSV / DOCX / image OCR; originals preserved byte-for-byte in the `rfp-archive` Docker volume, SHA-256 provenance columns on opportunities
+
+### Acceptance evidence (live)
+
+| Test | Result |
+|---|---|
+| UI board | All three columns live against proven endpoints ✅ |
+| **Real client RFP screenshot uploaded through browser** | `NL-OPP-2026-0004 → CLARIFICATION_REQUIRED (tesseract, 1091 chars)` — OCR → qwen3:14b → pipeline, honest clarification halt (no customer metadata in image) ✅ |
+| Provenance | `source_channel=upload:.png`, `extraction_method=tesseract`, filename + SHA-256 recorded ✅ |
+| Issues | I-08: pdfplumber pin typo (1.4.3→0.11.5) — fixed, rebuilt |
+
+### Phase 1 status after P1-13
+
+P1-A ✅ · P1-B ✅ · P1-13 ✅ → remaining: P1-C quotes/RAG (P1-14→18), P1-D proposals (P1-19→22), P1-E benchmarks/security (P1-23→25). Owner inputs pending: real vendor Excel, signed AM-1, 30–50 historical deals, golden AMC confirmation.
 
 **P1-02 — PostgreSQL 16 + pgvector + PITR + audit schema — ✅ PASSED (08-Aug-2026)**
 
