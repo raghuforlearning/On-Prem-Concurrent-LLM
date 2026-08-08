@@ -1,0 +1,47 @@
+# NationLabs Orchestrator — BUILD LOG
+
+Baseline: Architecture v2.0 + Phase 0 Discovery (frozen 07-Aug-2026)
+Rules: one backlog item at a time · acceptance test must pass before next item · air-gap only · no redesign without flagged blocker.
+
+---
+
+## P1-01 — Resize and validate the AI VM — ✅ PASSED (08-Aug-2026)
+
+**Acceptance criteria (Phase 0 §10, amended 08-Aug — see deviation D-01):** ≥16 vCPU; ≥36 GiB RAM (amended from ≥48); `nvidia-smi` clean; containers healthy; report committed.
+
+### Final verified results (executed by Raghu, guided session)
+
+| Check | Before | After | Verdict |
+|---|---|---|---|
+| vCPU | 8 | **16** | ✅ |
+| RAM | 23 GiB (422 Mi swap used) | **35 GiB, swap 0 B** | ✅ (deviation D-01) |
+| GPU | A30, ECC 0 | A30, **ECC 0** | ✅ |
+| Containers | 3 known | **6/6 auto-started**: ollama, guardrails-prod, guardrails-uat, **grafana, loki, open-webui** | ✅ |
+
+### How it was executed
+
+Off-site block resolved: Raghu ran guided commands himself (SSH + host RDP). VM real name discovered: `NL-AI-Inference-01`. Graceful `sudo shutdown -h now` from inside → `Set-VMProcessor -Count 16` + `Set-VMMemory -StartupBytes 36GB` on host → `Start-VM` → all 6 containers self-recovered within 4 minutes. Downtime ~5 min.
+
+### Deviation D-01 (flagged, architecture unchanged)
+
+Planned ≥48 GiB (v2.0 band 56–72) → delivered 36 GB static. **Reason:** host NLABDLAS01 had ~114/128 GB allocated across 10 running VMs; even after Raghu powered off 3 SAAD VMs, only 18.6 GB physical free; +12 GB keeps ~6 GB host headroom. **Follow-up:** 56 GB static remains the pre-production target — needs host RAM expansion or VM consolidation (owner: Niren/IT). Phase 1 workload fits comfortably in 36 GB (swap now 0).
+
+### New discoveries logged
+
+- **Grafana + Loki already containerized on the AI VM** (ports 3001/3100) — v2.0 observability stack partially pre-built; P1 observability tasks must inventory before deploying anything new.
+- **Open WebUI** on :3000 (healthy).
+- **`NL-ProposalBuilder-01` VM (16 GB) exists** on the host — prime candidate for the deferred Windows document-worker decision (D1).
+- 3 SAAD VMs powered off by Raghu to free RAM — flagged to confirm with their owner.
+
+### Next task
+
+**P1-02 — PostgreSQL 16 + pgvector, PITR backup, append-only hash-chained audit schema.** Waiting on go-ahead.
+
+**Status: P1-01 CLOSED. Ready for P1-02 on your go-ahead.**
+
+---
+
+## History — P1-01 blocked period (07-Aug, resolved 08-Aug)
+
+- Off-site laptop (10.212.134.200) had no route to the air-gapped 192.168.71.x segment; execution shifted to guided mode (Raghu's hands, Kimi's commands) — kept as the working pattern for VM-side tasks.
+- Artifacts from the blocked period retained for reuse: `build/p1-01/vm-validate.sh` (generic acceptance checker — RAM threshold updated to 36 GiB), `build/p1-01/vm-resize-hyperv.ps1` (reference runbook; actual resize was done interactively).
