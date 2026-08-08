@@ -130,9 +130,33 @@ PostgreSQL stays **native/systemd** (owns PITR cron + audit schema — container
 
 - **I-07 (test isolation):** pytest ticks processed ALL SENT RFQs → 3 phantom follow-ups + premature escalation on the real Fortinet RFQ. Fixed with `only_refs` scoping; phantom rows cleaned; re-verified: 3/3 passed with **0** production leakage. Lesson logged: global-effect functions need scope parameters from day one.
 
+**P1-11 — Approval engine — ✅ PASSED (08-Aug-2026)**
+
+### Built (`build/p1-11/app/approvals.py`, commit a7b2659)
+
+- `approval_rules` config table — thresholds as DATA, not code; provisional seed marked `PROVISIONAL-*` until Worksheet AM-1 is signed (flip with one UPDATE)
+- `approvals` table — PENDING→APPROVED/REJECTED with actor+timestamp; idempotent routing
+- Gap safety: amount outside all rules → engine **refuses** (`no approval rule covers X AED`) instead of misrouting
+
+### Acceptance evidence (live)
+
+| Test | Result |
+|---|---|
+| 45,000 AED | → FINAL_VERIFIER via AM-R1 ✅ |
+| 200,001 AED (the criterion) | → FINANCE via AM-R3 ✅ |
+| Idempotency | Double-submit → "already pending" ✅ |
+| Config-driven (no redeploy) | SQL UPDATE changed routing immediately ✅ |
+| Matrix gap (AM-R2 ceiling → 100K) | 150K refused: `no approval rule covers 150000.0 AED` ✅ |
+| Decision + audit | APPROVED by raghu, `approval_approved` hash-chained ✅ |
+
+### Notes
+
+- My initial T3 scenario was mis-specified (broke AM-R3's range instead of creating a gap) — caught, corrected, and it surfaced the gap-refusal feature as a bonus acceptance test. Matrix restored to clean provisional state.
+- **Owner input still needed:** signed AM-1 worksheet → flip `source` to SIGNED-AM1 (Niren/Finance).
+
 ### Next task
 
-**P1-11 — Approval engine** (config-driven matrix; needs Worksheet AM-1 signed by Niren/Finance — interim: ship with clearly-marked provisional thresholds).
+**P1-13 — Human-in-loop review UI** (extraction corrections, approval inbox, RFQ/deal-reg board — the Niren-visible surface).
 
 **P1-02 — PostgreSQL 16 + pgvector + PITR + audit schema — ✅ PASSED (08-Aug-2026)**
 
