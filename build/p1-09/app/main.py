@@ -17,7 +17,19 @@ from vendors import init_vendors
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://host.docker.internal:11434")
 BOOT_TS = time.time()
 
-app = FastAPI(title="NationLabs Orchestrator", version="0.3.0-p1.09")
+app = FastAPI(title="NationLabs Orchestrator", version="0.3.1-p1.09")
+
+
+@app.exception_handler(PermissionError)
+async def permission_denied(_, exc):
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=403, content={"error": "FORBIDDEN", "detail": str(exc)})
+
+
+@app.exception_handler(ValueError)
+async def bad_request(_, exc):
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=400, content={"error": "BAD_REQUEST", "detail": str(exc)})
 
 
 @app.on_event("startup")
