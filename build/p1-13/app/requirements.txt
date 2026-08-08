@@ -1,0 +1,8 @@
+# P1-03 MVP stack — pinned for air-gap reproducibility
+fastapi==0.115.12
+uvicorn[standard]==0.34.2
+psycopg[binary]==3.2.7
+httpx==0.28.1
+langgraph==0.4.8
+langgraph-checkpoint-postgres==2.0.21
+pytest==8.3.5

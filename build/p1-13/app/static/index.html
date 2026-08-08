@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NationLabs Orchestrator — Review Board</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg:#0f1720; --card:#1a2430; --edge:#2a3a4c; --txt:#e8eef4; --dim:#8fa3b5;
+          --ok:#2fbf71; --warn:#e2a63d; --bad:#e05d5d; --accent:#4da3ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--txt); }
+  header { padding:14px 22px; border-bottom:1px solid var(--edge); display:flex; align-items:center; gap:14px; }
+  header h1 { font-size:17px; margin:0; }
+  .dot { width:10px; height:10px; border-radius:50%; }
+  .dot.ok { background:var(--ok); } .dot.bad { background:var(--bad); }
+  #health { font-size:12px; color:var(--dim); }
+  main { display:grid; grid-template-columns:340px 1fr 300px; gap:14px; padding:14px; height:calc(100vh - 52px); }
+  .col { overflow-y:auto; }
+  .card { background:var(--card); border:1px solid var(--edge); border-radius:8px; padding:12px; margin-bottom:10px; }
+  .card h3 { margin:0 0 6px; font-size:13px; color:var(--dim); text-transform:uppercase; letter-spacing:.5px; }
+  .opp { cursor:pointer; } .opp:hover { border-color:var(--accent); }
+  .opp .id { font-weight:600; font-size:14px; }
+  .badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:10px; margin-left:6px; }
+  .READY { background:#123b28; color:var(--ok); }
+  .CLARIFICATION_REQUIRED { background:#3d3013; color:var(--warn); }
+  .DRAFT { background:#173042; color:var(--accent); }
+  .BLOCKED_PENDING_DEAL_REG { background:#3d1f1f; color:var(--bad); }
+  .SENT { background:#123b28; color:var(--ok); }
+  .PENDING { background:#3d3013; color:var(--warn); }
+  .APPROVED { background:#123b28; color:var(--ok); }
+  .row { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  button { background:var(--accent); border:0; color:#08111c; font-weight:600; padding:5px 10px;
+           border-radius:6px; cursor:pointer; font-size:12px; }
+  button.ghost { background:transparent; border:1px solid var(--edge); color:var(--txt); }
+  button:hover { filter:brightness(1.15); }
+  input, textarea, select { width:100%; background:#0d141c; border:1px solid var(--edge); color:var(--txt);
+           border-radius:6px; padding:7px; font-size:13px; margin-bottom:8px; }
+  textarea { min-height:110px; font-family:inherit; }
+  pre { background:#0d141c; border:1px solid var(--edge); border-radius:6px; padding:10px;
+        font-size:11.5px; overflow-x:auto; white-space:pre-wrap; max-height:280px; overflow-y:auto; }
+  .kv { font-size:13px; margin:3px 0; } .kv b { color:var(--dim); font-weight:600; }
+  .alert { font-size:12px; padding:8px; border-left:3px solid var(--warn); background:#0d141c;
+           margin-bottom:6px; border-radius:0 6px 6px 0; }
+  .alert.ESCALATION { border-color:var(--bad); }
+  .alert.RESPONSE_RECEIVED { border-color:var(--ok); }
+  .muted { color:var(--dim); font-size:12px; }
+  h2 { font-size:14px; margin:14px 0 8px; color:var(--accent); }
+  .clarif { display:flex; gap:6px; margin-bottom:6px; }
+  .clarif input { margin-bottom:0; }
+</style>
+</head>
+<body>
+<header>
+  <span id="hDot" class="dot bad"></span>
+  <h1>NationLabs AI Presales Orchestrator — Review Board</h1>
+  <span id="health">…</span>
+  <span style="flex:1"></span>
+  <span class="muted" id="clock"></span>
+</header>
+<main>
+  <!-- LEFT: intake + opportunity list -->
+  <div class="col">
+    <div class="card">
+      <h3>New RFP Intake</h3>
+      <textarea id="rfpText" placeholder="Paste WhatsApp message / RFP text here…"></textarea>
+      <button onclick="submitRfp()">Create &amp; Analyze</button>
+      <div id="intakeMsg" class="muted"></div>
+    </div>
+    <div id="oppList"></div>
+  </div>
+
+  <!-- CENTER: selected opportunity -->
+  <div class="col" id="detail"><div class="card muted">Select an opportunity ←</div></div>
+
+  <!-- RIGHT: approvals + alerts -->
+  <div class="col">
+    <div class="card"><h3>Pending Approvals</h3><div id="approvals"></div></div>
+    <div class="card"><h3>Alerts</h3><div id="alerts"></div></div>
+    <div class="card"><h3>LLM Token Meter</h3><div id="tokens"></div></div>
+  </div>
+</main>
+
+<script>
+const API = '';
+let current = null;
+
+async function j(path, opts) {
+  const r = await fetch(API + path, opts);
+  return r.json();
+}
+const post = (path, body) => j(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body||{})});
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function refreshHealth() {
+  const h = await j('/healthz');
+  document.getElementById('hDot').className = 'dot ' + (h.status==='ok'?'ok':'bad');
+  document.getElementById('health').textContent = h.status==='ok' ? `healthy · pg ✓ · ollama ✓` : 'DEGRADED';
+}
+
+async function refreshOpps() {
+  // lightweight board: reuse per-opp endpoint not available as list -> query via /opportunities/{id} on demand.
+  // For MVP board we keep a server-side list endpoint:
+  const list = await j('/opportunities');
+  const el = document.getElementById('oppList');
+  el.innerHTML = list.map(o => `
+    <div class="card opp" onclick="selectOpp('${o.opp_id}')">
+      <span class="id">${o.opp_id}</span><span class="badge ${o.status}">${o.status}</span>
+      <div class="muted">${esc(o.title||'(untitled)')} · readiness ${o.readiness_score ?? '—'}</div>
+    </div>`).join('') || '<div class="card muted">No opportunities yet.</div>';
+}
+
+async function submitRfp() {
+  const raw_text = document.getElementById('rfpText').value.trim();
+  if (!raw_text) return;
+  document.getElementById('intakeMsg').textContent = 'Analyzing with qwen3:14b… (up to 60s)';
+  const r = await post('/opportunities', {raw_text, source_channel:'whatsapp'});
+  document.getElementById('intakeMsg').textContent = r.opp_id ? `${r.opp_id} → ${r.status}` : JSON.stringify(r);
+  document.getElementById('rfpText').value = '';
+  await refreshOpps();
+  if (r.opp_id) selectOpp(r.opp_id);
+}
+
+async function selectOpp(id) {
+  current = id;
+  const o = await j('/opportunities/' + id);
+  const rfqs = await j(`/opportunities/${id}/rfqs`);
+  const d = document.getElementById('detail');
+  const ex = o.extraction || {}, cl = o.classification || {};
+  d.innerHTML = `
+    <div class="card">
+      <div class="row"><b style="font-size:16px">${o.opp_id}</b><span class="badge ${o.status}">${o.status}</span></div>
+      <div class="kv"><b>Readiness:</b> ${o.readiness_score ?? '—'}</div>
+      <div class="kv"><b>Customer:</b> ${esc(ex.customer?.customer_org||'—')} (${esc(ex.customer?.contact_name||'—')})</div>
+      <div class="kv"><b>Requirement:</b> ${esc(ex.requirement?.title||'—')}</div>
+      <div class="kv"><b>Classification:</b> ${(cl.proposal_types||[]).join('+')} · ${(cl.tech_domains||[]).join(', ')}</div>
+    </div>
+    ${o.clarifications.filter(c=>!c.answer).length ? `
+    <div class="card"><h3>Open Clarifications</h3>
+      ${o.clarifications.filter(c=>!c.answer).map(c=>`
+        <div class="clarif"><input id="ans_${esc(c.field)}" placeholder="${esc(c.field)}">
+        <button onclick="answer('${esc(c.field)}')">Set</button></div>`).join('')}
+    </div>` : ''}
+    <div class="card"><h3>Extraction JSON</h3><pre>${esc(JSON.stringify(ex,null,1))}</pre></div>
+    <div class="card">
+      <div class="row"><h3 style="margin:0">RFQs / Deal Registration</h3>
+      <button class="ghost" onclick="draftRfqs()">Match Vendors &amp; Draft</button></div>
+      <div id="rfqBoard">${renderRfqs(rfqs)}</div>
+    </div>`;
+}
+
+function renderRfqs(rfqs) {
+  if (!rfqs.length) return '<div class="muted" style="margin-top:8px">No RFQs yet.</div>';
+  return rfqs.map(r => `
+    <div class="card" style="margin-top:8px">
+      <div class="row"><b>${r.rfq_ref}</b><span class="badge ${r.status}">${r.status}</span></div>
+      <div class="kv"><b>${esc(r.vendor)}</b> (${r.tier})</div>
+      <div class="row" style="margin-top:6px">
+        ${r.status==='BLOCKED_PENDING_DEAL_REG' ? `<button onclick="approveDr('${r.rfq_ref}', ${r.vendor_id})">Approve Deal Reg</button>` : ''}
+        ${r.status==='DRAFT' ? `
+          <button class="ghost" onclick="viewDraft('${r.rfq_ref}')">View Draft</button>
+          <button onclick="approveDisclosure('${r.rfq_ref}')">Approve Disclosure</button>
+          <button onclick="sendRfq('${r.rfq_ref}')">Send</button>` : ''}
+      </div>
+      ${r.draft_preview ? `<pre style="margin-top:8px">${esc(r.draft_preview)}…</pre>` : ''}
+    </div>`).join('');
+}
+
+async function draftRfqs() {
+  await post(`/opportunities/${current}/rfqs`, {disclose_end_user: true});
+  selectOpp(current);
+}
+async function approveDr(ref, vendorId) {
+  const regRef = prompt('Deal registration reference from vendor portal:');
+  if (!regRef) return;
+  const approver = prompt('Your name (approver):') || 'ui.user';
+  await post(`/opportunities/${current}/deal-reg/approve`, {vendor_id: vendorId, reg_reference: regRef, approver});
+  selectOpp(current);
+}
+async function approveDisclosure(ref) {
+  const approver = prompt('Your name (approver):') || 'ui.user';
+  await post(`/rfqs/${ref}/approve-disclosure`, {approver});
+  selectOpp(current);
+}
+async function sendRfq(ref) {
+  const sender = prompt('Your name (sender — this sends the RFQ):');
+  if (!sender) return;
+  const r = await post(`/rfqs/${ref}/send`, {sender});
+  alert(r.error ? `${r.error}: ${r.detail}` : `${ref} → ${r.status}`);
+  selectOpp(current);
+}
+async function viewDraft(ref) {
+  const o = await j(`/opportunities/${current}/rfqs`);
+  const r = o.find(x => x.rfq_ref === ref);
+  alert(r?.draft_preview ? r.draft_preview + '…' : 'No draft');
+}
+async function answer(field) {
+  const v = document.getElementById('ans_' + CSS.escape(field)).value.trim();
+  if (!v) return;
+  await post(`/opportunities/${current}/clarifications`, {answers: {[field]: v}});
+  selectOpp(current);
+  refreshOpps();
+}
+
+async function refreshApprovals() {
+  const list = await j('/approvals');
+  document.getElementById('approvals').innerHTML = list.map(a => `
+    <div class="card">
+      <div class="row"><b>#${a.id}</b><span class="badge ${a.status}">${a.status}</span></div>
+      <div class="kv">${a.opp_id} · <b>${a.amount_aed?.toLocaleString()} AED</b> → ${a.routed_to}</div>
+      <div class="row" style="margin-top:6px">
+        <button onclick="decide(${a.id},'APPROVED')">Approve</button>
+        <button class="ghost" onclick="decide(${a.id},'REJECTED')">Reject</button>
+      </div>
+    </div>`).join('') || '<div class="muted">Queue empty 🎉</div>';
+}
+async function decide(id, decision) {
+  const approver = prompt(`Your name (${decision}):`); if (!approver) return;
+  const comment = prompt('Comment (optional):') || '';
+  await post(`/approvals/${id}/decide`, {approver, decision, comment});
+  refreshApprovals();
+}
+
+async function refreshAlerts() {
+  const list = await j('/alerts');
+  document.getElementById('alerts').innerHTML = list.slice(0,10).map(a =>
+    `<div class="alert ${a.kind}"><b>${a.kind}</b> · ${esc(a.message)}<br><span class="muted">${a.at}</span></div>`
+  ).join('') || '<div class="muted">No alerts.</div>';
+}
+
+async function refreshTokens() {
+  const t = await j('/metrics/tokens');
+  document.getElementById('tokens').innerHTML = `
+    <div class="kv"><b>LLM calls:</b> ${t.total_calls}</div>
+    <div class="kv"><b>Prompt tokens:</b> ${t.prompt_tokens?.toLocaleString()}</div>
+    <div class="kv"><b>Completion tokens:</b> ${t.completion_tokens?.toLocaleString()}</div>
+    <div class="kv"><b>Avg latency:</b> ${t.avg_latency_ms ? (t.avg_latency_ms/1000).toFixed(1)+'s' : '—'}</div>`;
+}
+
+async function tick() {
+  await Promise.all([refreshHealth(), refreshOpps(), refreshApprovals(), refreshAlerts(), refreshTokens()]);
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+}
+tick(); setInterval(refreshHealth, 15000); setInterval(refreshApprovals, 20000); setInterval(refreshAlerts, 20000);
+</script>
+</body>
+</html>
