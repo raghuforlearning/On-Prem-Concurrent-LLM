@@ -110,9 +110,29 @@ PostgreSQL stays **native/systemd** (owns PITR cron + audit schema — container
 - Draft body is generic when extraction lacks buyer contact/end-user (0003 had none — correct behavior; placeholder-driven). Prompt enrichment from full BOQ line items = P1-09b polish item.
 - Real vendor-master Excel (A-5.1) still required from Raghu to replace demo seed.
 
+**P1-10 + P1-12 — Follow-up engine + ported regression tests — ✅ PASSED (08-Aug-2026)**
+
+### Built (`build/p1-10/app/`, commits f377567/d5dee33)
+
+- `followup.py` — daily tick: stop-on-response, escalation after 3 nudges, ≥20h gap; **template-based nudges** (zero tokens — LLM reserved for thinking tasks); driven by host cron `08:07 daily` (reboot-persistent, no daemon)
+- `tests/test_followup.py` — the prototype's 3 failing regressions ported and GREEN: stop-on-quote, escalate-after-limit, **no-followups-before-send** (the deal-reg regression is now structural)
+
+### Acceptance evidence (live)
+
+| Test | Result |
+|---|---|
+| Ported regression tests | **3/3 passed** (vs 3 FAILED in old prototype) ✅ |
+| Live tick on real Fortinet RFQ | 20h-gap rule → nudge #1 fired after aging → response recorded → cadence stopped + RESPONSE_RECEIVED alert ✅ |
+| Escalation | Internal alert to assigned NL owner after limit ✅ |
+| Cron | `7 8 * * * curl -X POST localhost:8080/followups/run` installed ✅ |
+
+### Issues hit & fixed
+
+- **I-07 (test isolation):** pytest ticks processed ALL SENT RFQs → 3 phantom follow-ups + premature escalation on the real Fortinet RFQ. Fixed with `only_refs` scoping; phantom rows cleaned; re-verified: 3/3 passed with **0** production leakage. Lesson logged: global-effect functions need scope parameters from day one.
+
 ### Next task
 
-**P1-10 — Follow-up scheduler** (daily-morning cadence, stop-on-quote, escalation) + P1-12 port-fix of prototype's 3 failing follow-up tests.
+**P1-11 — Approval engine** (config-driven matrix; needs Worksheet AM-1 signed by Niren/Finance — interim: ship with clearly-marked provisional thresholds).
 
 **P1-02 — PostgreSQL 16 + pgvector + PITR + audit schema — ✅ PASSED (08-Aug-2026)**
 
