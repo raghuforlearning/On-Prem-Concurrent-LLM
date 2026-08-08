@@ -84,9 +84,35 @@ PostgreSQL stays **native/systemd** (owns PITR cron + audit schema — container
 - Model missed explicit "submit proposal by Aug 20" deadline in 0001 (extraction recall gap on deadline phrasing) — flow still correct; becomes a benchmark test case.
 - Worker service retired (graph runs in API process); dedicated worker returns in P1-10 (follow-up scheduler).
 
+**P1-08 + P1-09 — Vendor service, deal-reg gate, RFQ drafting — ✅ PASSED (08-Aug-2026)**
+
+### Test subject: REAL client RFP (SOC tooling BOQ, scanned WhatsApp image, 9 items / 7 vendors) — transcribed and submitted as NL-OPP-2026-0003.
+
+### Built (`build/p1-09/app/`, commits 563b8d7/b836425)
+
+- `vendors.py` — vendors + deal_registrations + rfqs tables; 8-vendor demo seed (6 OEMs + 2 distributors, matching the real RFP's vendor set); keyword/domain matching; **fail-closed `deal_reg_capable`** (blank = false)
+- `rfq.py` — the gates, enforced in code: BLOCKED_PENDING_DEAL_REG for OEM/deal-reg-capable distis until DR approved; end-user disclosure only for OEM/Distributor tier + recorded human approval; human-triggered send; idempotency keys on create + send
+- `main.py` — endpoints + clean 403/400 gate refusals (fix: were bare 500s)
+
+### Acceptance evidence (live)
+
+| Test | Result |
+|---|---|
+| RFQ creation on real RFP | 8 RFQs: CIS → DRAFT (no DR needed); 7 → **BLOCKED_PENDING_DEAL_REG** ✅ |
+| Deal-reg approval (Fortinet, ref FORT-DR-2026-8841) | Unblocked → qwen3:14b drafted professional RFQ **with deal-registration paragraph** ✅ |
+| Disclosure gate | Send refused without recorded approval; after `approver: raghu` recorded → allowed ✅ |
+| Human send + double-click | First `SENT`; second `already sent (idempotent)` ✅ |
+| Blocked send attempt (CrowdStrike) | Clean `403 FORBIDDEN: deal registration not approved` ✅ |
+| Duplicate creation | Re-run: all 8 "already exists (idempotent)", zero new rows ✅ |
+
+### Observations logged
+
+- Draft body is generic when extraction lacks buyer contact/end-user (0003 had none — correct behavior; placeholder-driven). Prompt enrichment from full BOQ line items = P1-09b polish item.
+- Real vendor-master Excel (A-5.1) still required from Raghu to replace demo seed.
+
 ### Next task
 
-**P1-09 — Deal-registration gate + idempotent RFQ drafting** (highest business value per your deal-reg emphasis; P1-08 vendor service needed first — real vendor Excel still an owner input).
+**P1-10 — Follow-up scheduler** (daily-morning cadence, stop-on-quote, escalation) + P1-12 port-fix of prototype's 3 failing follow-up tests.
 
 **P1-02 — PostgreSQL 16 + pgvector + PITR + audit schema — ✅ PASSED (08-Aug-2026)**
 
