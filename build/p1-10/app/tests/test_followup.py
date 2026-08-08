@@ -51,7 +51,7 @@ def test_followup_stops_on_quote(fixture_rfq):
         conn.execute("INSERT INTO vendor_responses (rfq_ref, response_type, raw_text) "
                      "VALUES (%s,'QUOTE','see attached')", (ref,))
         conn.commit()
-    s = process_followups(NOW + timedelta(days=1))
+    s = process_followups(NOW + timedelta(days=1), only_refs=[ref])
     assert ref in s["stopped_on_response"] and ref not in [n["rfq_ref"] for n in s["nudged"]]
 
 
@@ -60,7 +60,7 @@ def test_followup_escalates_after_limit(fixture_rfq):
     ref = fixture_rfq
     t = NOW
     for day in range(1, MAX_FOLLOWUPS + 2):       # enough ticks to exceed the limit
-        s = process_followups(t + timedelta(days=day))
+        s = process_followups(t + timedelta(days=day), only_refs=[ref])
     with psycopg.connect(PG_DSN) as conn:
         n = conn.execute("SELECT count(*) FROM followups WHERE rfq_ref=%s AND status='SENT'",
                          (ref,)).fetchone()[0]
@@ -77,7 +77,7 @@ def test_no_followups_before_send(fixture_rfq):
     with psycopg.connect(PG_DSN) as conn:
         conn.execute("UPDATE rfqs SET status='BLOCKED_PENDING_DEAL_REG' WHERE rfq_ref=%s", (ref,))
         conn.commit()
-    s = process_followups(NOW + timedelta(days=5))
+    s = process_followups(NOW + timedelta(days=5), only_refs=[ref])
     with psycopg.connect(PG_DSN) as conn:
         n = conn.execute("SELECT count(*) FROM followups WHERE rfq_ref=%s", (ref,)).fetchone()[0]
     assert n == 0 and ref not in [x["rfq_ref"] for x in s["nudged"]]

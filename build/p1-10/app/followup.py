@@ -68,8 +68,11 @@ def _has_response(conn, rfq_ref) -> bool:
                         (rfq_ref,)).fetchone() is not None
 
 
-def process_followups(now: datetime | None = None) -> dict:
-    """One scheduler tick. Returns a summary dict (also the acceptance evidence)."""
+def process_followups(now: datetime | None = None, only_refs: list[str] | None = None) -> dict:
+    """One scheduler tick. Returns a summary dict (also the acceptance evidence).
+
+    only_refs: restrict processing to these RFQ refs (used by tests — I-07 fix:
+    test ticks must never touch production RFQs)."""
     now = now or datetime.now(timezone.utc)
     summary = {"nudged": [], "stopped_on_response": [], "escalated": [], "skipped_recent": []}
     with psycopg.connect(PG_DSN) as conn:
@@ -78,6 +81,8 @@ def process_followups(now: datetime | None = None) -> dict:
             "FROM rfqs r JOIN vendors v ON v.vendor_id=r.vendor_id WHERE r.status='SENT'"
         ).fetchall()
         for rfq_ref, opp_id, sent_at, vendor, owner in sent_rfqs:
+            if only_refs is not None and rfq_ref not in only_refs:
+                continue
             # Rule 1: stop-on-quote (any response stops the cadence)
             if _has_response(conn, rfq_ref):
                 conn.execute(
