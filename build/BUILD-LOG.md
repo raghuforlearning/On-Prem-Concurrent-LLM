@@ -33,9 +33,35 @@ Planned ≥48 GiB (v2.0 band 56–72) → delivered 36 GB static. **Reason:** ho
 - **`NL-ProposalBuilder-01` VM (16 GB) exists** on the host — prime candidate for the deferred Windows document-worker decision (D1).
 - 3 SAAD VMs powered off by Raghu to free RAM — flagged to confirm with their owner.
 
+**P1-03 — Docker Compose MVP stack — ✅ ACCEPTANCE PASSED (08-Aug-2026)**
+
+### Design note (logged, no redesign)
+
+PostgreSQL stays **native/systemd** (owns PITR cron + audit schema — containerizing would orphan them); Ollama container untouched. Compose stack = `nl-api` (FastAPI) + `nl-worker` (LangGraph), reaching host services via `host.docker.internal`.
+
+### What was built (`build/p1-03/app/`, repo commit c379ec9)
+
+- `main.py` — FastAPI monolith skeleton: `/healthz` (Postgres + Ollama dependency checks), `/audit/probe` (writes via `orchestrator_app` into hash-chained audit_log)
+- `worker.py` — LangGraph one-node graph with `PostgresSaver` checkpointing + Postgres wait-loop for cold-boot races
+- `docker-compose.yml` — both services `restart: unless-stopped`, API healthcheck, `.env`-fed `PG_APP_PASSWORD`
+- `requirements.txt` — pinned (fastapi 0.115.12, langgraph 0.4.8, langgraph-checkpoint-postgres 2.0.21, psycopg 3.2.7) for air-gap reproducibility
+
+### Acceptance results (all 4 passed)
+
+1. `/healthz` → `"status":"ok"`, PostgreSQL 16.14 + Ollama (3 models) ✅
+2. `/audit/probe` → audit row seq 4, entry_hash chained ✅
+3. Worker log → `CHECKPOINT PERSISTED in PostgreSQL — resume-capable` ✅
+4. `checkpoints`/`checkpoint_writes`/`checkpoint_blobs`/`checkpoint_migrations` tables exist (owner orchestrator_app) ✅
+
+### Issues hit & fixed (all logged as config learning)
+
+- **I-04:** `.env` placeholder pasted literally (twice) → password reset to URL-safe build password `NlOrch2026SecurePassX9`. ⚠️ **Security task logged: rotate before production** (password has appeared in chat).
+- **I-05:** pg_hba rejected containers: Compose network is `172.19.0.x`, not default bridge `172.17.0.0/16`. Widened to `172.16.0.0/12` scoped to orchestrator_app+orchestrator DB only. `listen_addresses` = localhost + Docker bridge.
+- Reboot-survival test: pending final reboot check by Raghu.
+
 ### Next task
 
-**P1-02 — PostgreSQL 16 + pgvector, PITR backup, append-only hash-chained audit schema.** Waiting on go-ahead.
+**P1-07 — LangGraph real workflow: intake → extract+classify → readiness gate → clarification loop** (P1-04/05/06 housekeeping folded in as time allows).
 
 **P1-02 — PostgreSQL 16 + pgvector + PITR + audit schema — ✅ PASSED (08-Aug-2026)**
 
