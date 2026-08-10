@@ -1,43 +1,109 @@
-# On-Prem Concurrent LLM
+# NationLabs AI Presales Orchestrator
 
-Self-hosted, GPU-accelerated local LLM platform for NationLabs Technical Research & Development — built to serve **NL-Proposal-Builder** and **Niren's AI agents** as shared consumers of one internal API, the same way they'd call any hosted LLM provider.
+## Purpose
 
-## Architecture
+This repository is the working implementation repository for the **NationLabs AI Presales Orchestrator**.
 
-```
-NLABDLAS01 (Dell PowerEdge R750, Windows Server 2019, Hyper-V)
-  └── NL-AI-Inference-01 (Ubuntu 22.04 LTS VM, GPU via DDA passthrough)
-        └── NVIDIA A30 (24GB VRAM)
-        └── Docker + nvidia-container-toolkit
-              └── Ollama (shared serving layer, port 11434)
-                    ├── qwen3:14b          — primary/everyday
-                    ├── deepseek-r1:32b    — heavy reasoning (Qwen distillation)
-                    └── gemma3:4b          — fast utility, also runs self-check rails
-              └── NeMo Guardrails — AI Guardrail Policy v1.0 (Phase 3, live)
-                    ├── guardrails-uat  (port 8001, reasoning trace visible)
-                    └── guardrails-prod (port 8000, reasoning trace stripped)
-              └── Open WebUI (port 3000, demo UI, routed through guardrails-uat)
+The Orchestrator manages the presales workflow from opportunity/RFP intake through AI analysis, vendor/RFQ coordination, Deal Registration, quote lifecycle, approvals, proposal handoff and follow-up.
 
-Consumers (network clients of the guardrails endpoint, not Ollama directly):
-  - NL-Proposal-Builder (src/anthropic.js multi-provider router) — Phase 5, not yet wired, will use guardrails-prod
-  - Niren's AI agents — Phase 6, not yet wired, will use guardrails-prod
-```
+It is designed for local / air-gapped deployment.
 
-The GPU is bound to exactly one VM via DDA — that's a hard Hyper-V limitation, not a design choice. Sharing happens one layer up: everything that needs the GPU talks to the one serving endpoint over the network, the same way NL-Proposal-Builder already talks to Groq's cloud API today.
+## System boundaries
 
-## Repo layout
+The solution consists of three separate systems:
 
-- `infra/01-create-vm.ps1` — Hyper-V VM provisioning + GPU DDA attachment (run on the host)
-- `infra/02-setup-gpu-docker.sh` — NVIDIA driver, CUDA, Docker, nvidia-container-toolkit (run inside the VM)
-- `serving/docker-compose.yml` — Ollama, guardrails-uat, guardrails-prod, and Open WebUI containers
-- `serving/guardrails/` — NeMo Guardrails Dockerfile + `config_uat/` and `config_prod/` (content-safety and prompt-injection rails per AI Guardrail Policy v1.0)
-- `RUNBOOK.md` — full operational runbook: build history, gotchas, current status, troubleshooting
+### 1. AI Presales Orchestrator — active development
+Responsibilities include:
+- opportunities and RFP intake,
+- workflow orchestration,
+- LangGraph state/checkpoint management,
+- vendor and RFQ workflow,
+- Deal Registration,
+- follow-up,
+- quote lifecycle,
+- approvals,
+- RAG,
+- audit,
+- dashboards/review UI,
+- Proposal Builder handoff.
 
-## Current status
+### 2. NationLabs Local LLM Platform — frozen external system
+Provides local AI inference through Ollama/approved local models and existing guardrail capability.
 
-See `RUNBOOK.md` for the authoritative, up-to-date phase-by-phase status. Phases 1, 2, 3, and 4 complete: VM + GPU passthrough, Ollama serving 3 models, NeMo Guardrails (UAT/Prod split per AI Guardrail Policy v1.0) in front of it, and an Open WebUI demo for Niren routed through the guardrails. Phase 5 (NL-Proposal-Builder integration) and Phase 6 (hand off to Niren's agents) not yet started.
+The Orchestrator consumes this through an adapter.
 
-## Access
+### 3. NationLabs Proposal Builder — frozen external system
+Provides deterministic proposal/document-domain capabilities already implemented by NationLabs.
 
-- VM: `ssh <user>@192.168.71.11` (LAN) or via `10.10.10.3` (internal management network)
-- Ollama API: `http://192.168.71.11:11434`
+The Orchestrator consumes this through an adapter.
+
+**The Local LLM does not directly control the Proposal Builder. The Orchestrator is the only coordinator.**
+
+## Active Orchestrator technology
+
+- FastAPI
+- LangGraph
+- PostgreSQL 16
+- pgvector
+- SQLAlchemy
+- Docker / Docker Compose
+- local Ollama inference via adapter
+- lightweight browser review UI
+
+## Current validated milestone
+
+**P1-13 PASSED**
+
+Known-good reference commit:
+
+`3a0488a` — `P1-13 PASSED: review board UI + file intake with OCR provenance`
+
+See:
+- `AGENTS.md`
+- `CURRENT-STATE.md`
+- `BACKLOG.md`
+- `build/BUILD-LOG.md`
+- `docs/NationLabs-Orchestrator-Architecture-v2.0.md`
+- `docs/NationLabs-Orchestrator-Phase0-Discovery-Gap-Assessment.md`
+
+## Important repository note
+
+This repository contains historical Local LLM and legacy Orchestrator material.
+
+Examples:
+- `serving/`
+- `infra/`
+- `nationlabs-orchestrator/` legacy Flask/SQLite prototype
+- older `build/p1-*` snapshots
+
+Do not infer the active architecture from those folders alone.
+
+For implementation decisions, follow `AGENTS.md` and `CURRENT-STATE.md`.
+
+## Current development direction
+
+Architecture and Phase 0 are frozen as the implementation baseline unless a genuine implementation blocker is found.
+
+Active work continues in:
+
+**P1-C — Quote Intelligence + RAG**
+
+The Local LLM Platform and Proposal Builder must not be modified as part of Orchestrator development.
+
+## Working discipline
+
+Every implementation task must follow:
+
+**BUILD -> TEST -> PASS -> DOCUMENT -> COMMIT -> NEXT**
+
+A task is not complete until:
+- acceptance tests pass,
+- regression tests pass,
+- build log/current state/backlog are updated,
+- changes are committed with the relevant P1 task ID.
+
+## Air-gap rule
+
+Production design must remain compatible with an air-gapped environment.
+
+Do not add unapproved cloud AI, SaaS APIs or internet dependencies to the Orchestrator.
