@@ -8,11 +8,11 @@ Architecture v2.0 and Phase 0 are the implementation baseline.
 
 Current validated milestone:
 
-**P1-15 PASSED**
+**P1-16 PASSED**
 
 Validated implementation branch:
 
-`codex/p1-15-proposal-builder-adapter`
+`codex/p1-16-deterministic-quote-validation`
 
 The exact task commit SHA is reported in the completion handoff after commit creation.
 
@@ -82,6 +82,11 @@ The Orchestrator is the only coordinator between the Local LLM and Proposal Buil
 - ingestion-attempt audit and `FAILED_REVIEW` queue
 - identical-source idempotency
 - quote receipt/extraction while Deal Registration is pending
+- deterministic `Decimal` line/subtotal/VAT/total validation
+- configurable currency, totals, VAT and required-terms policy
+- persisted validation history and readiness status
+- mismatch-to-human-review routing with hash-chained audit evidence
+- no automatic correction of vendor figures and no LLM money path
 
 ### UI
 - human-in-loop review board
@@ -161,7 +166,7 @@ Those descriptions are historical and are not the current Orchestrator architect
 
 ## Known repository condition at handoff
 
-The active P1-15 implementation is under `build/p1-15/app/`. The legacy
+The active P1-16 implementation is under `build/p1-16/app/`. The legacy
 `nationlabs-orchestrator/` Flask/SQLite tree is not current.
 
 The frozen Proposal Builder repository had a pre-existing untracked overview
@@ -171,11 +176,12 @@ document during takeover. It was not modified or included in Orchestrator work.
 
 **P1-C — Quote Intelligence + RAG**
 
-P1-15 is **passed**. Its adapter, provenance/version persistence, failure-review
-path, full 18-test regression suite and approved live Proposal Builder contract
-all passed without changing the frozen Builder.
+P1-16 is **passed**. Its deterministic validation engine, PostgreSQL history,
+review/audit workflow and human-review visibility pass the full 27-test suite.
+The seeded error remains blocked without changing vendor figures, while the
+valid quote proceeds. The engine has no LLM dependency.
 
-The exact next engineering item is **P1-16 — Deterministic quote validation**.
+The exact next engineering item is **P1-17 — Approved-content RAG**.
 P1-14 historical dataset collection remains an owner/data activity that can
 continue separately.
 

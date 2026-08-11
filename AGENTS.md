@@ -107,10 +107,10 @@ Do not revert the active implementation to the legacy Flask/SQLite/custom-state-
 
 Current known-good milestone:
 
-**P1-13 PASSED**
+**P1-16 PASSED**
 
-Known Git baseline:
-`3a0488a` — `P1-13 PASSED: review board UI + file intake with OCR provenance`
+Known implementation baseline:
+`build/p1-16/app/` on the P1-16 task commit reported in the completion handoff.
 
 Completed implementation areas include:
 - P1-01 VM sizing/validation
@@ -123,6 +123,8 @@ Completed implementation areas include:
 - P1-11 configurable approval engine
 - P1-12 follow-up regression fixes
 - P1-13 human review UI + multi-format RFP upload/OCR provenance
+- P1-15 frozen Proposal Builder adapter + quote lifecycle/provenance/versioning
+- P1-16 deterministic quote validation + review/audit workflow
 
 Before changing code, verify this against:
 - `git status`

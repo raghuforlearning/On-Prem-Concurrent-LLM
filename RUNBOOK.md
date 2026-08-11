@@ -19,11 +19,11 @@ For current implementation decisions, use:
 
 Known-good milestone:
 
-**P1-15 PASSED**
+**P1-16 PASSED**
 
 Active implementation:
 
-`build/p1-15/app/`
+`build/p1-16/app/`
 
 Do not reset the repository to this commit automatically because the working tree contains uncommitted historical changes.
 
@@ -157,7 +157,7 @@ Never commit:
 
 Use `.env.example` for placeholders only.
 
-For P1-15, create an ignored `build/p1-15/app/.env` with:
+For the active P1-16 application, create an ignored `build/p1-16/app/.env` with:
 
 ```text
 PG_APP_PASSWORD=<existing orchestrator_app database password>
@@ -165,12 +165,22 @@ PROPOSAL_BUILDER_URL=<approved internal Builder URL>
 PROPOSAL_BUILDER_USERNAME=<approved service account>
 PROPOSAL_BUILDER_PASSWORD=<approved service-account password>
 PROPOSAL_BUILDER_TIMEOUT_S=120
+QUOTE_VALIDATION_MONEY_TOLERANCE=0.01
+QUOTE_VALIDATION_REQUIRE_CURRENCY_DETECTED=true
+QUOTE_VALIDATION_REQUIRE_STATED_TOTALS=false
+QUOTE_VALIDATION_REQUIRE_VAT=false
+QUOTE_VALIDATION_REQUIRED_TERMS=
 ```
 
-The P1-15 `.dockerignore` excludes `.env` and `.env.*` from the Docker build
+The P1-16 `.dockerignore` excludes `.env` and `.env.*` from the Docker build
 context. Before distributing an image, verify `/srv/app/.env` does not exist in
 the image. Do not publish expanded Compose configuration because it may print
 environment-provided credentials.
+
+Quote-validation policy is server-controlled. `QUOTE_VALIDATION_REQUIRED_TERMS`
+is a comma-separated subset of `validity,payment,delivery`. Enable stated-total
+or VAT requirements only after the applicable commercial policy is approved;
+do not hard-code or ask an LLM to infer a tax rule.
 
 The `quote-archive` Docker volume stores immutable raw quote sources. Preserve
 and back it up together with PostgreSQL workflow data; the database retains each
@@ -196,7 +206,7 @@ Only after review should Codex begin P1-C implementation.
 
 ## 13. Current next engineering priority
 
-**P1-16 — Deterministic quote validation**
+**P1-17 — Approved-content RAG**
 
 P1-14 historical dataset collection can proceed in parallel as an owner/data activity.
 

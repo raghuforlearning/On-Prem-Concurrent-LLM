@@ -5,6 +5,44 @@ Rules: one backlog item at a time · acceptance test must pass before next item 
 
 ---
 
+## P1-16 — Deterministic quote validation — ✅ PASSED (11-Aug-2026)
+
+### Implemented (`build/p1-16/app/`)
+
+- `quote_validation.py` — pure standard-library `Decimal` engine for quantity ×
+  unit price, line totals, subtotal, VAT, grand total, currency confirmation and
+  policy-required validity/payment/delivery terms.
+- `quotes.py` — additive validation status/history schema, claims/policy
+  snapshots, computed values, mismatch review routing and append-only audit.
+- `POST /quotes/{quote_id}/validate` and `GET /quotes/{quote_id}/validation`.
+- review board visibility for open quote-validation discrepancies.
+- server-controlled environment policy for tolerance, currency confirmation,
+  stated totals, VAT and required terms.
+
+The Orchestrator compares vendor claims and records discrepancies. It never
+auto-corrects vendor figures. No Local LLM, Proposal Builder implementation or
+cloud/SaaS dependency is present in the validation engine.
+
+### Acceptance evidence
+
+| Test | Result |
+|---|---|
+| Pure deterministic P1-16 tests | 5 passed |
+| Seeded arithmetic-error repeatability | blocked 20/20 runs |
+| Live valid quote | `VALIDATED`; AED 28,500.00 + AED 1,425.00 VAT = AED 29,925.00 |
+| Live error quote, repeated | `BLOCKED` both runs; same review; two audit events |
+| Vendor-claim immutability | passed; seeded wrong line total remained unchanged |
+| Human-review/API/UI visibility | passed |
+| Full P1-10/P1-12/P1-15/P1-16 suite | **27 passed** |
+| Compose configuration | passed |
+| Built-image secret check | passed; `/srv/app/.env` absent |
+
+The live suite used disposable `pgvector/pgvector:pg16`, the committed P1-02
+audit schema and the `orchestrator_app` ownership model. Test resources were
+removed after acceptance. Frozen external systems were not modified.
+
+---
+
 ## P1-15 — Quote lifecycle / Proposal Builder adapter — ✅ PASSED (11-Aug-2026)
 
 ### Implemented (`build/p1-15/app/`)

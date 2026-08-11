@@ -6,7 +6,8 @@ One backlog item at a time:
 
 **BUILD -> TEST -> PASS -> DOCUMENT -> COMMIT -> NEXT**
 
-P1-01 through P1-13 are treated as the validated baseline unless a takeover audit proves otherwise.
+P1-01 through P1-16 (excluding the owner-data P1-14 activity) are treated as
+the validated implementation baseline unless a takeover audit proves otherwise.
 
 ---
 
@@ -22,8 +23,10 @@ P1-01 through P1-13 are treated as the validated baseline unless a takeover audi
 - [x] P1-11 — configuration-driven approval engine
 - [x] P1-12 — follow-up regression fixes
 - [x] P1-13 — human review UI + file intake/OCR provenance
+- [x] P1-15 — frozen Proposal Builder adapter + quote lifecycle/provenance/versioning
+- [x] P1-16 — deterministic quote validation + review/audit workflow
 
-Known-good reference commit: `3a0488a`.
+The P1-16 task commit SHA is reported in the completion handoff.
 
 ---
 
@@ -54,7 +57,7 @@ Acceptance:
 - at least 30 complete labelled deals pass schema validation before model benchmark sign-off.
 
 Important:
-- do not block P1-15 coding while the full dataset is being collected.
+- do not block independent P1-C engineering while the full dataset is being collected.
 
 ---
 
@@ -109,7 +112,19 @@ Acceptance:
 
 ## P1-16 — Deterministic quote validation
 
-Status: **PENDING**
+Status: **PASSED (11-Aug-2026)**
+
+Validation evidence:
+- pure `Decimal` engine validates line totals, subtotal, VAT, grand total,
+  currency confirmation and policy-required validity/payment/delivery terms.
+- persisted validation history, `VALIDATED`/`BLOCKED`/`NEEDS_REVIEW` status,
+  review-queue linkage and hash-chained audit events implemented.
+- seeded arithmetic-error quote remained blocked for 20/20 pure runs and both
+  live PostgreSQL validations; vendor claims were not auto-corrected.
+- valid quote proceeded with computed AED 28,500.00 subtotal, AED 1,425.00 VAT
+  and AED 29,925.00 total.
+- full P1-16 image suite: 27 passed; Compose and image-secret checks passed.
+- validation engine imports only Python standard-library modules and has no LLM path.
 
 Build Orchestrator-side control checks around structured quote results:
 - quote totals,
@@ -342,19 +357,7 @@ Until email integration exists:
 
 ---
 
-# Immediate Codex takeover task
+# Immediate next engineering task
 
-Before implementing P1-14/P1-15:
-
-1. Read `AGENTS.md`.
-2. Read `CURRENT-STATE.md`.
-3. Read this backlog.
-4. Read Architecture v2.0 and Phase 0.
-5. Inspect `build/p1-13/app/`.
-6. Inspect Git status and last 10 commits.
-7. Run current tests.
-8. Report inconsistencies.
-9. Confirm whether P1-14/P1-15 has any partial implementation.
-10. Do not modify code during the takeover audit.
-
-After the audit, begin P1-15 unless a verified blocker or already-started task changes the ordering.
+Begin **P1-17 — Approved-content RAG** from the validated
+`build/p1-16/app/` baseline. P1-14 remains a parallel owner/data activity.
