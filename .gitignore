@@ -12,6 +12,11 @@ Thumbs.db
 *.log
 logs/
 
+# Python test/runtime caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
 # NeMo Guardrails local config overrides (once added) - keep the template,
 # ignore any environment-specific overrides
 guardrails/config.local.yml

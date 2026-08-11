@@ -19,11 +19,11 @@ For current implementation decisions, use:
 
 Known-good milestone:
 
-**P1-13 PASSED**
+**P1-15 PASSED**
 
-Known-good reference commit:
+Active implementation:
 
-`3a0488a`
+`build/p1-15/app/`
 
 Do not reset the repository to this commit automatically because the working tree contains uncommitted historical changes.
 
@@ -157,6 +157,25 @@ Never commit:
 
 Use `.env.example` for placeholders only.
 
+For P1-15, create an ignored `build/p1-15/app/.env` with:
+
+```text
+PG_APP_PASSWORD=<existing orchestrator_app database password>
+PROPOSAL_BUILDER_URL=<approved internal Builder URL>
+PROPOSAL_BUILDER_USERNAME=<approved service account>
+PROPOSAL_BUILDER_PASSWORD=<approved service-account password>
+PROPOSAL_BUILDER_TIMEOUT_S=120
+```
+
+The P1-15 `.dockerignore` excludes `.env` and `.env.*` from the Docker build
+context. Before distributing an image, verify `/srv/app/.env` does not exist in
+the image. Do not publish expanded Compose configuration because it may print
+environment-provided credentials.
+
+The `quote-archive` Docker volume stores immutable raw quote sources. Preserve
+and back it up together with PostgreSQL workflow data; the database retains each
+archive path and SHA-256 digest.
+
 If a credential appears in a build log or shared archive, rotate it before production use.
 
 ## 12. Codex takeover sequence
@@ -177,7 +196,7 @@ Only after review should Codex begin P1-C implementation.
 
 ## 13. Current next engineering priority
 
-**P1-15 — Quote lifecycle / Proposal Builder adapter**
+**P1-16 — Deterministic quote validation**
 
 P1-14 historical dataset collection can proceed in parallel as an owner/data activity.
 

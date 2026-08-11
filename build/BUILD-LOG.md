@@ -5,6 +5,50 @@ Rules: one backlog item at a time · acceptance test must pass before next item 
 
 ---
 
+## P1-15 — Quote lifecycle / Proposal Builder adapter — ✅ PASSED (11-Aug-2026)
+
+### Implemented (`build/p1-15/app/`)
+
+- `integrations/proposal_builder/` — typed HTTP boundary around the frozen
+  builder's existing session-authenticated `/api/extract-quote` endpoint.
+- `quote_lifecycle.py` — content-addressed source archival before adapter use,
+  SHA-256 provenance, idempotent ingest and no-silent-drop failure handling.
+- `quotes.py` — PostgreSQL vendor-response provenance, quote groups/revisions,
+  current-version uniqueness, line items, ingestion attempts and
+  `FAILED_REVIEW` queue.
+- API routes for quote upload/listing, review queue and builder health.
+- quote ingestion deliberately remains allowed while Deal Registration is
+  pending; proposal generation/release retains the later DR gate.
+- Proposal Builder URL/user/password are environment-only; no credential was
+  committed and no Proposal Builder source was changed.
+- `.dockerignore` excludes `.env`/`.env.*` from the Docker build context; the
+  built image was inspected and contained no `/srv/app/.env`.
+
+### Test evidence
+
+| Test | Result |
+|---|---|
+| Offline adapter/schema/lifecycle suite | 14 passed; live DB test skipped as designed |
+| PostgreSQL 16 + pgvector live P1-15 suite | 15 passed |
+| Full active suite (P1-15 + P1-10/P1-12 regressions) | **18 passed** |
+| Compose configuration | passed |
+| P1-15 Python syntax parse | 21 files passed |
+| Built-image secret check | passed; `/srv/app/.env` absent |
+| Approved live Proposal Builder authentication | passed |
+| Live Builder quote extraction | passed; 5 normalized AED line items |
+| Live archive/provenance/persistence/audit/idempotency/DR assertions | passed |
+
+The live suites used an exact disposable `pgvector/pgvector:pg16` container
+initialized with the committed P1-02 audit schema. The final live contract used
+the frozen Builder's read-only synthetic wrapped-quote fixture and an approved
+service account. It verified raw byte preservation, matching SHA-256, structured
+PostgreSQL storage, quote version 1, two quote audit events, identical-source
+idempotency and continued quote work in `BLOCKED_PENDING_DEAL_REG` state.
+
+No Proposal Builder or Local LLM source/configuration was modified.
+
+---
+
 ## P1-01 — Resize and validate the AI VM — ✅ PASSED (08-Aug-2026)
 
 **Acceptance criteria (Phase 0 §10, amended 08-Aug — see deviation D-01):** ≥16 vCPU; ≥36 GiB RAM (amended from ≥48); `nvidia-smi` clean; containers healthy; report committed.
@@ -55,7 +99,7 @@ PostgreSQL stays **native/systemd** (owns PITR cron + audit schema — container
 
 ### Issues hit & fixed (all logged as config learning)
 
-- **I-04:** `.env` placeholder pasted literally (twice) → password reset to URL-safe build password `NlOrch2026SecurePassX9`. ⚠️ **Security task logged: rotate before production** (password has appeared in chat).
+- **I-04:** `.env` placeholder pasted literally (twice) → password reset to a temporary build password. ⚠️ **Security task remains: rotate before production** because the historical value appeared in chat and Git history.
 - **I-05:** pg_hba rejected containers: Compose network is `172.19.0.x`, not default bridge `172.17.0.0/16`. Widened to `172.16.0.0/12` scoped to orchestrator_app+orchestrator DB only. `listen_addresses` = localhost + Docker bridge.
 - **I-06 (root cause of boot race):** first reboot showed Postgres bound only `127.0.0.1` — it started before Docker created the `172.17.0.1` bridge and silently bound what it could. Fixed with systemd drop-in `/etc/systemd/system/postgresql@16-main.service.d/after-docker.conf` (`After=docker.service`).
 - **Reboot-survival test: ✅ PASSED (2nd reboot)** — 43 s after boot: all 8 containers up (nl-api healthy, nl-worker, ollama, guardrails ×2, grafana, loki, open-webui), healthz `"status":"ok"`, zero manual intervention. Criterion ≤3 min — beat by 4×.

@@ -1,0 +1,33 @@
+# P1-07 — Orchestrator API with real workflow graph (runs in API process).
+# Postgres native, Ollama existing container — both reached via host gateway.
+name: nl-orchestrator
+
+services:
+  api:
+    build: .
+    container_name: nl-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - rfp-archive:/srv/data/rfp_archive   # originals preserved byte-for-byte
+      - quote-archive:/srv/data/quote_archive # raw vendor quotes, content-addressed
+    environment:
+      PG_DSN: postgresql://orchestrator_app:${PG_APP_PASSWORD}@host.docker.internal:5432/orchestrator
+      OLLAMA_URL: http://host.docker.internal:11434
+      ANALYSIS_MODEL: qwen3:14b
+      PROPOSAL_BUILDER_URL: ${PROPOSAL_BUILDER_URL:-http://host.docker.internal:3000}
+      PROPOSAL_BUILDER_USERNAME: ${PROPOSAL_BUILDER_USERNAME:-}
+      PROPOSAL_BUILDER_PASSWORD: ${PROPOSAL_BUILDER_PASSWORD:-}
+      PROPOSAL_BUILDER_TIMEOUT_S: ${PROPOSAL_BUILDER_TIMEOUT_S:-120}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8080/healthz', timeout=3).raise_for_status()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  rfp-archive:
+  quote-archive:

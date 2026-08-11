@@ -60,7 +60,19 @@ Important:
 
 ## P1-15 — Quote lifecycle / Proposal Builder adapter
 
-Status: **NEXT ENGINEERING PRIORITY**
+Status: **PASSED (11-Aug-2026)**
+
+Validation evidence:
+- Orchestrator-side HTTP adapter, typed normalization, raw-source archival,
+  PostgreSQL lifecycle/version persistence and `FAILED_REVIEW` queue implemented
+  under `build/p1-15/app/`.
+- full disposable-PostgreSQL suite: 18 passed, including P1-10/P1-12 regressions.
+- approved live Proposal Builder contract: passed with its read-only synthetic
+  quote fixture, producing 5 normalized AED line items.
+- raw archive bytes and SHA-256 provenance, database persistence, quote version,
+  audit linkage, pending-Deal-Registration behavior and identical-source
+  idempotency all passed.
+- no Proposal Builder source was changed and no default/example credential was used.
 
 Architecture decision:
 - do not modify Proposal Builder.

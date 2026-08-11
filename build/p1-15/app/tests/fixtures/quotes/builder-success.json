@@ -1,0 +1,27 @@
+{
+  "ok": true,
+  "items": [
+    {
+      "sno": 1,
+      "pn": "FG-100F-BDL",
+      "desc": "FortiGate 100F appliance and support",
+      "qty": 2,
+      "up": 12500.00,
+      "total": 25000.00
+    },
+    {
+      "sno": 2,
+      "pn": "PS-SVC-01",
+      "desc": "Implementation services",
+      "qty": 1,
+      "up": 3500.00,
+      "total": 3500.00
+    }
+  ],
+  "currency": "AED",
+  "currencyDetected": true,
+  "warning": null,
+  "notice": null,
+  "source": "pdf",
+  "via": null
+}

@@ -8,13 +8,15 @@ Architecture v2.0 and Phase 0 are the implementation baseline.
 
 Current validated milestone:
 
-**P1-13 PASSED**
+**P1-15 PASSED**
 
-Known-good Git commit:
+Validated implementation branch:
 
-`3a0488a` — `P1-13 PASSED: review board UI + file intake with OCR provenance`
+`codex/p1-15-proposal-builder-adapter`
 
-Date of this handoff baseline: 10-Aug-2026.
+The exact task commit SHA is reported in the completion handoff after commit creation.
+
+Date of this validated baseline: 11-Aug-2026.
 
 ## Product boundary
 
@@ -72,6 +74,15 @@ The Orchestrator is the only coordinator between the Local LLM and Proposal Buil
 - gap-refusal safety
 - actor/timestamp audit
 
+### Quote lifecycle
+- frozen Proposal Builder HTTP adapter
+- typed quote-result normalization
+- content-addressed raw quote archive and SHA-256 provenance
+- PostgreSQL quote groups, revisions and current-version control
+- ingestion-attempt audit and `FAILED_REVIEW` queue
+- identical-source idempotency
+- quote receipt/extraction while Deal Registration is pending
+
 ### UI
 - human-in-loop review board
 - opportunity pipeline
@@ -87,7 +98,7 @@ The Orchestrator is the only coordinator between the Local LLM and Proposal Buil
 ### Proposal Builder
 Do not modify it.
 
-The Orchestrator will integrate through an adapter/interface.
+The Orchestrator integrates quote extraction through its adapter/interface.
 
 Proposal Builder remains authoritative for the deterministic capabilities it already owns, including proposal generation and its existing document-domain processing.
 
@@ -150,24 +161,25 @@ Those descriptions are historical and are not the current Orchestrator architect
 
 ## Known repository condition at handoff
 
-The Git repository contains uncommitted modifications in legacy Local LLM/Guardrails/infrastructure files and one legacy Orchestrator web file.
+The active P1-15 implementation is under `build/p1-15/app/`. The legacy
+`nationlabs-orchestrator/` Flask/SQLite tree is not current.
 
-Do not reset, discard or mix these changes into new Orchestrator work without first identifying their purpose.
-
-The P1-13 commit is the known-good implementation reference.
+The frozen Proposal Builder repository had a pre-existing untracked overview
+document during takeover. It was not modified or included in Orchestrator work.
 
 ## Next implementation area
 
 **P1-C — Quote Intelligence + RAG**
 
-The next work should be performed only inside the Orchestrator and should respect the frozen external-system boundaries.
+P1-15 is **passed**. Its adapter, provenance/version persistence, failure-review
+path, full 18-test regression suite and approved live Proposal Builder contract
+all passed without changing the frozen Builder.
 
-Before coding P1-C, perform a takeover audit:
-- inspect the active P1-13 application,
-- run the existing test suite,
-- verify current DB schema/migrations,
-- verify current Git working tree,
-- confirm no P1-14/P1-15 work has already been partially implemented.
+The exact next engineering item is **P1-16 — Deterministic quote validation**.
+P1-14 historical dataset collection remains an owner/data activity that can
+continue separately.
+
+The next work should be performed only inside the Orchestrator and should respect the frozen external-system boundaries.
 
 ## Owner inputs still pending
 
