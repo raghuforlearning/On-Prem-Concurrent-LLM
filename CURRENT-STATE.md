@@ -8,11 +8,11 @@ Architecture v2.0 and Phase 0 are the implementation baseline.
 
 Current validated milestone:
 
-**P1-23 PASSED**
+**P1-25 PASSED**
 
 Validated implementation branch:
 
-`codex/p1-23-benchmark-harness`
+`codex/p1-25-security-hardening`
 
 The exact task commit SHA is reported in the completion handoff after commit creation.
 
@@ -187,7 +187,7 @@ Those descriptions are historical and are not the current Orchestrator architect
 
 ## Known repository condition at handoff
 
-The active P1-23 implementation is under `build/p1-23/app/`. The legacy
+The active P1-25 implementation is under `build/p1-25/app/`. The legacy
 `nationlabs-orchestrator/` Flask/SQLite tree is not current.
 
 The frozen Proposal Builder repository had a pre-existing untracked overview
@@ -197,19 +197,17 @@ document during takeover. It was not modified or included in Orchestrator work.
 
 **P1-E - Benchmarking and security**
 
-P1-23 benchmark harness is **passed**. It validates local labelled benchmark
-datasets, replays fixture predictions/evaluator outputs across extraction,
-classification, vendor-response classification and quote extraction cases,
-computes case/type metrics, persists reports and audit events, and clearly marks
-small sample runs as `INSUFFICIENT_DATA` until the real dataset exists.
+P1-25 Orchestrator security hardening is **passed**. It adds local file security
+screening/quarantine events, prompt-injection regression checks, RBAC policy
+verification helpers, restore-verification evidence, security event persistence,
+audit linkage and secrets-hygiene regression checks without cloud/SaaS scanners.
 
-P1-24 model go/no-go remains blocked until the owner-provided P1-14 30-50
-labelled historical opportunities are available and run through the harness.
-P1-20 and P1-21 remain blocked/deferred until frozen Proposal Builder build
-output is available.
-
-The exact next actionable engineering item is **P1-25 - Security hardening**,
-unless the historical benchmark dataset or Builder endpoint is supplied first.
+All currently actionable Orchestrator P1 items are complete through P1-25.
+Remaining blocked/deferred items:
+- P1-20/P1-21 require frozen Proposal Builder build output.
+- P1-24 requires the real P1-14 labelled historical dataset benchmark run.
+- Production ops controls such as ClamAV/Wazuh/full isolated restore drills
+  remain deployment/operations activities.
 
 The next work should be performed only inside the Orchestrator and should respect the frozen external-system boundaries.
 

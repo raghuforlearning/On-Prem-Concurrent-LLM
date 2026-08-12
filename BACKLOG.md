@@ -362,7 +362,7 @@ Do not lower thresholds simply to make a model pass.
 
 ## P1-25 — Security hardening
 
-Status: **PENDING**
+Status: **PASSED (12-Aug-2026) - Orchestrator controls**
 
 Includes:
 - controlled file intake,
@@ -376,9 +376,10 @@ Includes:
 - data retention/backup review.
 
 Acceptance:
-- agreed security regression suite passes,
-- audit and restore evidence exists,
-- no unapproved data egress.
+- agreed local security regression suite passes,
+- audit, security event and restore-verification evidence exists,
+- no unapproved data egress,
+- production ops controls such as ClamAV/Wazuh/full isolated restore drill remain deployment activities.
 
 ---
 
@@ -399,4 +400,4 @@ Until email integration exists:
 
 # Immediate next engineering task
 
-Begin **P1-24 — Model go/no-go** only after the real P1-14 labelled historical dataset is available and the P1-23 harness has run it. Until then, the next actionable item is **P1-25 — Security hardening**. P1-20/P1-21 remain blocked/deferred until frozen Proposal Builder build output is available.
+All currently actionable Orchestrator P1 items are complete through P1-25. Remaining blocked/deferred items: P1-20/P1-21 require frozen Proposal Builder build output; P1-24 requires the real P1-14 labelled historical dataset benchmark run. Next action is to supply one of those external inputs or start production deployment hardening/ops validation.

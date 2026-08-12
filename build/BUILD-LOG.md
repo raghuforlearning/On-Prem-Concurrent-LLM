@@ -5,6 +5,43 @@ Rules: one backlog item at a time · acceptance test must pass before next item 
 
 ---
 
+## P1-25 - Security hardening - PASSED, Orchestrator controls (12-Aug-2026)
+
+### Built (`build/p1-25/app/`)
+
+- `security.py` - local file signature/active-content screening, prompt-injection
+  regression detection, RBAC policy helpers, security event persistence and
+  restore-verification evidence.
+- FastAPI endpoints for file scan, prompt-injection check, RBAC check,
+  restore-verification recording and security event listing.
+- Security tables for `security_events`, `rbac_roles` and
+  `restore_verifications`, all linked through audit events.
+- Secrets-hygiene regression check for the active snapshot.
+
+### Acceptance evidence
+
+| Test | Result |
+|---|---|
+| Pure P1-25 security tests | **5 passed** |
+| Live P1-25 Postgres security test | **1 passed** against disposable PostgreSQL 16 + pgvector |
+| Full P1-15-P1-25 snapshot suite | **56 passed, 15 skipped** against disposable PostgreSQL 16 + pgvector |
+| File security | active PDF content, bad extension and magic mismatch quarantine locally |
+| Prompt-injection regression | common instruction-override/secret-exfiltration phrases flagged |
+| RBAC/restore/audit | policy checks, restore evidence and security audit events persisted |
+| Secrets hygiene | active snapshot has no committed `.env` or obvious token/private-key markers |
+
+Temporary Docker test database was removed after testing. No cloud/SaaS scanner,
+Proposal Builder or Local LLM implementation/configuration was changed.
+
+### Remaining gated work
+
+All currently actionable Orchestrator P1 implementation items are complete
+through P1-25. P1-20/P1-21 require frozen Proposal Builder build output, and
+P1-24 requires the real P1-14 labelled historical dataset benchmark run.
+Production operations still need target-server validation for ClamAV/Wazuh/full
+isolated restore drills before production sign-off.
+
+---
 ## P1-23 - Benchmark harness - PASSED, harness ready (12-Aug-2026)
 
 ### Built (`build/p1-23/app/`)

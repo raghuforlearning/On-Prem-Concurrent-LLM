@@ -19,11 +19,11 @@ For current implementation decisions, use:
 
 Known-good milestone:
 
-**P1-23 PASSED**
+**P1-25 PASSED**
 
 Active implementation:
 
-`build/p1-23/app/`
+`build/p1-25/app/`
 
 Do not reset the repository to this commit automatically because the working tree contains uncommitted historical changes.
 
@@ -253,6 +253,20 @@ P1-23 operations:
 - P1-24 requires the real P1-14 labelled historical dataset before a go/no-go
   decision can be made.
 
+P1-25 operations:
+- use `POST /security/files/scan` for local file screening decisions before
+  processing suspicious uploads.
+- a `QUARANTINE` file decision or `FLAG` prompt-injection decision must be
+  reviewed by an authorized human; do not manually promote flagged content.
+- use `POST /security/rbac/check` for policy verification during integration
+  work; role definitions live in the Orchestrator database and are seeded at
+  startup.
+- use `POST /security/restore-verifications` to record restore/audit-chain
+  evidence from deployment or DR exercises.
+- ClamAV/Wazuh/full isolated restore drills remain production operations work;
+  do not claim they are running until installed and verified on the target
+  servers.
+
 If a credential appears in a build log or shared archive, rotate it before production use.
 
 ## 12. Codex takeover sequence
@@ -273,10 +287,11 @@ Only after review should Codex begin P1-C implementation.
 
 ## 13. Current next engineering priority
 
-**P1-25 - Security hardening**
+**External-input gated**
 
-P1-24 model go/no-go requires the real P1-14 labelled historical dataset and a
-completed P1-23 benchmark run. P1-20 and P1-21 remain blocked/deferred until
-frozen Proposal Builder build output is available. If either missing input
-arrives first, return to that blocked item; otherwise proceed with security
-hardening.
+All currently actionable Orchestrator P1 implementation items are complete
+through P1-25. Remaining blocked/deferred work requires external inputs:
+P1-20/P1-21 need frozen Proposal Builder build output, and P1-24 needs the real
+P1-14 labelled historical dataset benchmark run. Production security operations
+such as ClamAV/Wazuh/full isolated restore drills must be validated on the target
+servers before production sign-off.
