@@ -19,11 +19,11 @@ For current implementation decisions, use:
 
 Known-good milestone:
 
-**P1-17 PASSED**
+**P1-18 PASSED**
 
 Active implementation:
 
-`build/p1-17/app/`
+`build/p1-18/app/`
 
 Do not reset the repository to this commit automatically because the working tree contains uncommitted historical changes.
 
@@ -157,7 +157,7 @@ Never commit:
 
 Use `.env.example` for placeholders only.
 
-For the active P1-17 application, create an ignored `build/p1-17/app/.env` with:
+For the active P1-18 application, create an ignored `build/p1-18/app/.env` with:
 
 ```text
 PG_APP_PASSWORD=<existing orchestrator_app database password>
@@ -176,7 +176,7 @@ RAG_OLLAMA_TIMEOUT_S=300
 RAG_WORKER_POLL_S=2
 ```
 
-The P1-17 `.dockerignore` excludes `.env` and `.env.*` from the Docker build
+The P1-18 `.dockerignore` excludes `.env` and `.env.*` from the Docker build
 context. Before distributing an image, verify `/srv/app/.env` does not exist in
 the image. Do not publish expanded Compose configuration because it may print
 environment-provided credentials.
@@ -203,6 +203,18 @@ P1-17 operations:
 - a `FAILED_REVIEW` draft job requires human inspection; never silently
   publish its output.
 
+P1-18 operations:
+- record a non-AED exchange rate with the actual rate date and an internal
+  finance/source reference before comparison. The Orchestrator does not fetch
+  rates from the internet and no LLM may infer one.
+- retain all quote revisions. Only a current, parsed, deterministically
+  validated quote can enter a new comparison or be selected.
+- compare quotes while Deal Registration is pending when business work needs to
+  continue, but treat `proposal_eligible=false` as a hard downstream release
+  gate until that vendor path is `APPROVED` or `NOT_REQUIRED`.
+- do not edit comparison run result JSON or a selection snapshot in-place;
+  create a new comparison/selection decision with its own audit history.
+
 If a credential appears in a build log or shared archive, rotate it before production use.
 
 ## 12. Codex takeover sequence
@@ -223,7 +235,7 @@ Only after review should Codex begin P1-C implementation.
 
 ## 13. Current next engineering priority
 
-**P1-18 — Multi-vendor / multi-quote comparison**
+**P1-19 — Proposal Builder handoff**
 
 P1-14 historical dataset collection can proceed in parallel as an owner/data activity.
 

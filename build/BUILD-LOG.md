@@ -5,6 +5,43 @@ Rules: one backlog item at a time · acceptance test must pass before next item 
 
 ---
 
+## P1-18 — Multi-vendor / multi-quote comparison — ✅ PASSED (12-Aug-2026)
+
+### Built (`build/p1-18/app/`)
+
+- `quote_comparison.py` — deterministic `Decimal` AED normalization, canonical
+  result serialization/hash, recorded exchange-rate provenance, immutable
+  comparison runs and human-selected quote/version freeze.
+- PostgreSQL comparison inputs retain exact quote/version/validation/rate ids;
+  selection decisions preserve every selected and non-selected candidate.
+- FastAPI endpoints record exchange rates, create/list comparison runs and
+  select/read the active quote selection.
+- Selection permits commercial work while Deal Registration is pending but marks
+  the downstream proposal gate ineligible until that vendor path is satisfied.
+
+### Acceptance evidence
+
+| Test | Result |
+|---|---|
+| Three-vendor native/AED matrix | passed; AED, USD and EUR totals retained and normalized from recorded rates |
+| Repeatability | same inputs in different order produced byte-identical `result_json` and hash |
+| Revision history | superseded v1 retained; only current validated v2 selected |
+| Human selection | selected version/snapshot/actor/reason/time preserved; non-selected decisions recorded |
+| Deal Registration | pending vendor can be compared/selected but remains `proposal_eligible=false` |
+| Deterministic boundary | no LLM and no exchange-rate network lookup in comparison service |
+| Full P1-15–P1-18 suite | **46 passed** against disposable PostgreSQL 16 + pgvector |
+| Compose/image/secrets | configuration and image-secret checks passed; configured secret scan passed |
+
+Temporary Docker test database, network and image were removed after testing.
+No Proposal Builder or Local LLM implementation/configuration was changed.
+
+### Next task
+
+**P1-19 — Proposal Builder handoff.** P1-14 historical dataset collection
+remains a parallel owner/data activity.
+
+---
+
 ## P1-16 — Deterministic quote validation — ✅ PASSED (11-Aug-2026)
 
 ### Implemented (`build/p1-16/app/`)

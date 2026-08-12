@@ -107,10 +107,10 @@ Do not revert the active implementation to the legacy Flask/SQLite/custom-state-
 
 Current known-good milestone:
 
-**P1-17 PASSED**
+**P1-18 PASSED**
 
 Known implementation baseline:
-`build/p1-17/app/` on the P1-17 task commit reported in the completion handoff.
+`build/p1-18/app/` on the P1-18 task commit reported in the completion handoff.
 
 Completed implementation areas include:
 - P1-01 VM sizing/validation
@@ -126,6 +126,7 @@ Completed implementation areas include:
 - P1-15 frozen Proposal Builder adapter + quote lifecycle/provenance/versioning
 - P1-16 deterministic quote validation + review/audit workflow
 - P1-17 approved-content pgvector RAG + queued grounded drafting
+- P1-18 deterministic multi-vendor comparison + human quote/version selection
 
 Before changing code, verify this against:
 - `git status`

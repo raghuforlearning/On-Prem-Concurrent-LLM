@@ -6,7 +6,7 @@ One backlog item at a time:
 
 **BUILD -> TEST -> PASS -> DOCUMENT -> COMMIT -> NEXT**
 
-P1-01 through P1-17 (excluding the owner-data P1-14 activity) are treated as
+P1-01 through P1-18 (excluding the owner-data P1-14 activity) are treated as
 the validated implementation baseline unless a takeover audit proves otherwise.
 
 ---
@@ -26,8 +26,9 @@ the validated implementation baseline unless a takeover audit proves otherwise.
 - [x] P1-15 — frozen Proposal Builder adapter + quote lifecycle/provenance/versioning
 - [x] P1-16 — deterministic quote validation + review/audit workflow
 - [x] P1-17 — approved-content pgvector RAG + queued grounded drafting
+- [x] P1-18 — multi-vendor comparison + frozen human quote/version selection
 
-The P1-17 task commit SHA is reported in the completion handoff.
+The P1-18 task commit SHA is reported in the completion handoff.
 
 ---
 
@@ -196,7 +197,22 @@ Acceptance:
 
 ## P1-18 — Multi-vendor / multi-quote comparison
 
-Status: **PENDING**
+Status: **PASSED (12-Aug-2026)**
+
+Validation evidence:
+- native currency totals and line amounts remain intact; non-AED amounts are
+  normalized only with an explicitly recorded AED rate, date and source.
+- comparison result serialization and hash are byte-stable regardless of quote
+  input ordering; no LLM or rate network lookup is used.
+- comparison runs retain exact quote/version/validation/rate inputs and the
+  immutable result JSON/hash.
+- human quote selection freezes the selected quote/version and commercial
+  snapshot, records every non-selected candidate and creates an audit event.
+- old/superseded revisions stay intact and cannot be selected; a pending
+  deal-registration quote may be compared/selected but is marked ineligible
+  for proposal generation/release until the gate is satisfied.
+- full disposable PostgreSQL 16/pgvector suite: 46 passed, including the live
+  P1-17 `bge-m3` and `qwen3:14b` smoke test.
 
 Build:
 - quote groups and revisions,
@@ -379,5 +395,5 @@ Until email integration exists:
 
 # Immediate next engineering task
 
-Begin **P1-18 — Multi-vendor / multi-quote comparison** from the validated
-`build/p1-17/app/` baseline. P1-14 remains a parallel owner/data activity.
+Begin **P1-19 — Proposal Builder handoff** from the validated
+`build/p1-18/app/` baseline. P1-14 remains a parallel owner/data activity.

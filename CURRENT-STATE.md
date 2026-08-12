@@ -8,11 +8,11 @@ Architecture v2.0 and Phase 0 are the implementation baseline.
 
 Current validated milestone:
 
-**P1-17 PASSED**
+**P1-18 PASSED**
 
 Validated implementation branch:
 
-`codex/p1-17-approved-content-rag`
+`codex/p1-18-multi-vendor-comparison`
 
 The exact task commit SHA is reported in the completion handoff after commit creation.
 
@@ -109,6 +109,16 @@ The Orchestrator is the only coordinator between the Local LLM and Proposal Buil
 - queued local `qwen3:14b` grounded drafting with one worker
 - live `bge-m3` adapter validation against the internal Ollama service
 
+### Multi-vendor / multi-quote comparison
+- recorded human-supplied AED exchange rates with date/source provenance
+- native-currency-preserving side-by-side quote and line-item matrix
+- deterministic AED normalization, canonical result JSON and immutable hashes
+- preserved comparison runs with exact quote/version/validation/rate inputs
+- human quote/version selection and frozen commercial snapshot
+- explicit selected/not-selected decision history and audit events
+- per-vendor Deal Registration visibility; comparison may proceed while pending,
+  while proposal eligibility remains fail-closed
+
 ## Important current decisions
 
 ### Proposal Builder
@@ -177,7 +187,7 @@ Those descriptions are historical and are not the current Orchestrator architect
 
 ## Known repository condition at handoff
 
-The active P1-17 implementation is under `build/p1-17/app/`. The legacy
+The active P1-18 implementation is under `build/p1-18/app/`. The legacy
 `nationlabs-orchestrator/` Flask/SQLite tree is not current.
 
 The frozen Proposal Builder repository had a pre-existing untracked overview
@@ -187,13 +197,12 @@ document during takeover. It was not modified or included in Orchestrator work.
 
 **P1-C — Quote Intelligence + RAG**
 
-P1-17 is **passed**. Its approved-content filtering, hostile-content refusal,
-scope isolation, citation provenance, pricing-row chunk integrity, retrieval
-audit, validated-commercial separation and queued local drafting pass the full
-40-test suite. Live `bge-m3` embeddings return 1,024 dimensions and the existing
-`qwen3:14b` returns the required grounded JSON/citation contract.
+P1-18 is **passed**. Its deterministic multi-vendor comparison, recorded rate
+provenance, byte-stable result hashes, immutable run history, revision retention,
+human selection snapshot and per-vendor Deal Registration eligibility checks pass
+the full 46-test suite. No LLM performs commercial arithmetic or rate selection.
 
-The exact next engineering item is **P1-18 — Multi-vendor / multi-quote comparison**.
+The exact next engineering item is **P1-19 — Proposal Builder handoff**.
 P1-14 historical dataset collection remains an owner/data activity that can
 continue separately.
 
