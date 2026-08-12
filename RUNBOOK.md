@@ -19,11 +19,11 @@ For current implementation decisions, use:
 
 Known-good milestone:
 
-**P1-18 PASSED**
+**P1-22 PASSED**
 
 Active implementation:
 
-`build/p1-18/app/`
+`build/p1-22/app/`
 
 Do not reset the repository to this commit automatically because the working tree contains uncommitted historical changes.
 
@@ -233,6 +233,17 @@ P1-19 operations:
   available; the passed implementation validates the Orchestrator foundation
   with the documented adapter contract.
 
+P1-22 operations:
+- proposal release is human-controlled. The Orchestrator records release
+  package readiness and submission evidence; it does not send email or submit
+  to external portals.
+- prepare release only from a completed document build job with passing
+  validation and final DOCX/PDF artifact refs plus SHA-256 hashes.
+- record customer submission evidence with method, recipient, evidence ref,
+  evidence SHA-256, submitted-by and recorded-by fields.
+- repeated submission recording for the same release package is idempotent and
+  returns the existing submission.
+
 If a credential appears in a build log or shared archive, rotate it before production use.
 
 ## 12. Codex takeover sequence
@@ -253,10 +264,9 @@ Only after review should Codex begin P1-C implementation.
 
 ## 13. Current next engineering priority
 
-**P1-20 - TP golden-fidelity gate**
+**P1-23 - Benchmark harness**
 
-P1-14 historical dataset collection can proceed in parallel as an owner/data activity.
-
-Start P1-20 only after the frozen Proposal Builder build endpoint/output is
-available for validation. If `/api/v1/builds` is unavailable, resolve that
-external integration blocker first. Do not modify the Proposal Builder itself.
+P1-20 and P1-21 remain blocked/deferred until frozen Proposal Builder build
+output is available. If the Builder endpoint arrives first, return to P1-20;
+otherwise proceed with the benchmark harness. P1-14 historical dataset collection
+can proceed in parallel as an owner/data activity.

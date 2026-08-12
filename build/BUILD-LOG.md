@@ -5,6 +5,42 @@ Rules: one backlog item at a time · acceptance test must pass before next item 
 
 ---
 
+## P1-22 - Proposal release flow - PASSED (12-Aug-2026)
+
+### Built (`build/p1-22/app/`)
+
+- Release-package schema for final approval/artifact snapshots and deterministic
+  package hashes.
+- Human-controlled submission recording with method, recipient, evidence ref,
+  evidence SHA-256, submitted-by and recorded-by fields.
+- FastAPI endpoints for release package preparation, submission recording and
+  release package lookup.
+- Release gates require completed document build, passing validation, final
+  DOCX/PDF artifacts and SHA-256 hashes, approved proposal-value approval and
+  satisfied Deal Registration state.
+
+### Acceptance evidence
+
+| Test | Result |
+|---|---|
+| Pure P1-22 API/boundary tests | **2 passed** |
+| Live P1-22 Postgres release tests | **2 passed** against disposable PostgreSQL 16 + pgvector |
+| Full P1-15-P1-22 snapshot suite | **47 passed, 13 skipped** against disposable PostgreSQL 16 + pgvector |
+| Release gates | blocked when final PDF artifact was missing |
+| Submission control | recorded human submission evidence; no external send path exists |
+| Audit lineage | release package and customer submission audit actions recorded |
+
+Temporary Docker test database was removed after testing. No Proposal Builder or
+Local LLM implementation/configuration was changed.
+
+### Next task
+
+P1-20 and P1-21 remain blocked/deferred until frozen Proposal Builder build
+output is available. The next actionable open engineering item is **P1-23 -
+Benchmark harness**, unless the Builder endpoint is supplied first. P1-14 remains
+a parallel owner/data activity.
+
+---
 ## P1-19 - Proposal Builder handoff - PASSED, Orchestrator foundation (12-Aug-2026)
 
 ### Built (`build/p1-19/app/`)

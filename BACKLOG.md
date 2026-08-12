@@ -304,7 +304,7 @@ If still required:
 
 ## P1-22 — Proposal release flow
 
-Status: **PENDING**
+Status: **PASSED (12-Aug-2026)**
 
 Build:
 - final review,
@@ -315,10 +315,11 @@ Build:
 - human-controlled external submission.
 
 Acceptance:
-- complete opportunity -> proposal lineage,
+- complete opportunity -> proposal lineage recorded,
 - no release without required gates,
 - final artifacts and hashes recorded,
-- customer submission action auditable.
+- customer submission action auditable,
+- no external email/send action performed by the Orchestrator.
 
 ---
 
@@ -396,4 +397,4 @@ Until email integration exists:
 
 # Immediate next engineering task
 
-Begin **P1-20 — TP golden-fidelity gate** after the external frozen Proposal Builder build endpoint/output is available for validation. If `/api/v1/builds` is still unavailable, resolve that integration blocker first. P1-14 remains a parallel owner/data activity.
+P1-20 and P1-21 remain blocked/deferred until frozen Proposal Builder build output is available. The next actionable open engineering item is **P1-23 — Benchmark harness**, unless the Builder endpoint is supplied first. P1-14 remains a parallel owner/data activity.
