@@ -19,11 +19,11 @@ For current implementation decisions, use:
 
 Known-good milestone:
 
-**P1-16 PASSED**
+**P1-17 PASSED**
 
 Active implementation:
 
-`build/p1-16/app/`
+`build/p1-17/app/`
 
 Do not reset the repository to this commit automatically because the working tree contains uncommitted historical changes.
 
@@ -157,7 +157,7 @@ Never commit:
 
 Use `.env.example` for placeholders only.
 
-For the active P1-16 application, create an ignored `build/p1-16/app/.env` with:
+For the active P1-17 application, create an ignored `build/p1-17/app/.env` with:
 
 ```text
 PG_APP_PASSWORD=<existing orchestrator_app database password>
@@ -170,9 +170,13 @@ QUOTE_VALIDATION_REQUIRE_CURRENCY_DETECTED=true
 QUOTE_VALIDATION_REQUIRE_STATED_TOTALS=false
 QUOTE_VALIDATION_REQUIRE_VAT=false
 QUOTE_VALIDATION_REQUIRED_TERMS=
+EMBEDDING_MODEL=bge-m3
+RAG_DRAFT_MODEL=qwen3:14b
+RAG_OLLAMA_TIMEOUT_S=300
+RAG_WORKER_POLL_S=2
 ```
 
-The P1-16 `.dockerignore` excludes `.env` and `.env.*` from the Docker build
+The P1-17 `.dockerignore` excludes `.env` and `.env.*` from the Docker build
 context. Before distributing an image, verify `/srv/app/.env` does not exist in
 the image. Do not publish expanded Compose configuration because it may print
 environment-provided credentials.
@@ -185,6 +189,19 @@ do not hard-code or ask an LLM to infer a tax rule.
 The `quote-archive` Docker volume stores immutable raw quote sources. Preserve
 and back it up together with PostgreSQL workflow data; the database retains each
 archive path and SHA-256 digest.
+
+P1-17 operations:
+- the approved interim host is the `aiinference` VM at `192.168.71.11`; the
+  physical Hyper-V host is `192.168.71.2`.
+- Ollama must expose `bge-m3` with 1,024-dimensional embeddings and
+  `qwen3:14b` through the internal adapter endpoint.
+- knowledge ingestion always creates `DRAFT`; an authorized reviewer must
+  approve cleared content before customer-facing retrieval.
+- `FLAGGED`, expired, superseded, unapproved or out-of-scope content must not
+  be manually promoted through direct database edits.
+- run exactly one `rag-worker` service for the MVP.
+- a `FAILED_REVIEW` draft job requires human inspection; never silently
+  publish its output.
 
 If a credential appears in a build log or shared archive, rotate it before production use.
 
@@ -206,7 +223,7 @@ Only after review should Codex begin P1-C implementation.
 
 ## 13. Current next engineering priority
 
-**P1-17 — Approved-content RAG**
+**P1-18 — Multi-vendor / multi-quote comparison**
 
 P1-14 historical dataset collection can proceed in parallel as an owner/data activity.
 

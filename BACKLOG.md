@@ -6,7 +6,7 @@ One backlog item at a time:
 
 **BUILD -> TEST -> PASS -> DOCUMENT -> COMMIT -> NEXT**
 
-P1-01 through P1-16 (excluding the owner-data P1-14 activity) are treated as
+P1-01 through P1-17 (excluding the owner-data P1-14 activity) are treated as
 the validated implementation baseline unless a takeover audit proves otherwise.
 
 ---
@@ -25,8 +25,9 @@ the validated implementation baseline unless a takeover audit proves otherwise.
 - [x] P1-13 — human review UI + file intake/OCR provenance
 - [x] P1-15 — frozen Proposal Builder adapter + quote lifecycle/provenance/versioning
 - [x] P1-16 — deterministic quote validation + review/audit workflow
+- [x] P1-17 — approved-content pgvector RAG + queued grounded drafting
 
-The P1-16 task commit SHA is reported in the completion handoff.
+The P1-17 task commit SHA is reported in the completion handoff.
 
 ---
 
@@ -151,7 +152,26 @@ Acceptance:
 
 ## P1-17 — Approved-content RAG
 
-Status: **PENDING**
+Status: **PASSED (12-Aug-2026)**
+
+Validation evidence:
+- pgvector-backed approved-content store with HNSW semantic search and
+  PostgreSQL full-text hybrid ranking.
+- SQL prefilters approval, security, content class, validity, expiry and
+  customer/vendor scope before scoring.
+- ingestion is always `DRAFT`; human approval is role-gated; detected hostile
+  prompt-injection content is `FLAGGED` and cannot be approved.
+- structure-aware 600-word chunks use 90-word overlap; pricing/table rows stay
+  atomic; repeated text under distinct sections retains both provenance records.
+- citations carry document/version/status/section/page/source/hash/date/owner/
+  score; retrieval and draft transitions are audited.
+- accepted commercial values come only from a current deterministically
+  `VALIDATED` quote and are passed separately from untrusted RAG context.
+- heavy grounded drafting is queued and consumed by one local worker.
+- full PostgreSQL 16/pgvector suite: 40 passed, including live `bge-m3`
+  (1,024 dimensions) and `qwen3:14b` grounded-output contract tests.
+- Compose and image-secret exclusion checks passed; frozen systems were not
+  modified by the Orchestrator implementation.
 
 Build:
 - pgvector-backed local RAG,
@@ -359,5 +379,5 @@ Until email integration exists:
 
 # Immediate next engineering task
 
-Begin **P1-17 — Approved-content RAG** from the validated
-`build/p1-16/app/` baseline. P1-14 remains a parallel owner/data activity.
+Begin **P1-18 — Multi-vendor / multi-quote comparison** from the validated
+`build/p1-17/app/` baseline. P1-14 remains a parallel owner/data activity.

@@ -8,15 +8,15 @@ Architecture v2.0 and Phase 0 are the implementation baseline.
 
 Current validated milestone:
 
-**P1-16 PASSED**
+**P1-17 PASSED**
 
 Validated implementation branch:
 
-`codex/p1-16-deterministic-quote-validation`
+`codex/p1-17-approved-content-rag`
 
 The exact task commit SHA is reported in the completion handoff after commit creation.
 
-Date of this validated baseline: 11-Aug-2026.
+Date of this validated baseline: 12-Aug-2026.
 
 ## Product boundary
 
@@ -98,6 +98,17 @@ The Orchestrator is the only coordinator between the Local LLM and Proposal Buil
 - alerts
 - token meter
 
+### Approved-content RAG
+- PostgreSQL/pgvector knowledge documents, chunks and 1,024-dimensional vectors
+- explicit content class, approval, security, validity, expiry and scope metadata
+- human-only approval and fail-closed prompt-injection screening
+- structure-aware chunks with pricing/table-row integrity
+- hybrid HNSW semantic and PostgreSQL full-text retrieval
+- complete citation provenance and audited retrieval events
+- accepted validated quote facts kept separate from RAG language
+- queued local `qwen3:14b` grounded drafting with one worker
+- live `bge-m3` adapter validation against the internal Ollama service
+
 ## Important current decisions
 
 ### Proposal Builder
@@ -166,7 +177,7 @@ Those descriptions are historical and are not the current Orchestrator architect
 
 ## Known repository condition at handoff
 
-The active P1-16 implementation is under `build/p1-16/app/`. The legacy
+The active P1-17 implementation is under `build/p1-17/app/`. The legacy
 `nationlabs-orchestrator/` Flask/SQLite tree is not current.
 
 The frozen Proposal Builder repository had a pre-existing untracked overview
@@ -176,12 +187,13 @@ document during takeover. It was not modified or included in Orchestrator work.
 
 **P1-C — Quote Intelligence + RAG**
 
-P1-16 is **passed**. Its deterministic validation engine, PostgreSQL history,
-review/audit workflow and human-review visibility pass the full 27-test suite.
-The seeded error remains blocked without changing vendor figures, while the
-valid quote proceeds. The engine has no LLM dependency.
+P1-17 is **passed**. Its approved-content filtering, hostile-content refusal,
+scope isolation, citation provenance, pricing-row chunk integrity, retrieval
+audit, validated-commercial separation and queued local drafting pass the full
+40-test suite. Live `bge-m3` embeddings return 1,024 dimensions and the existing
+`qwen3:14b` returns the required grounded JSON/citation contract.
 
-The exact next engineering item is **P1-17 — Approved-content RAG**.
+The exact next engineering item is **P1-18 — Multi-vendor / multi-quote comparison**.
 P1-14 historical dataset collection remains an owner/data activity that can
 continue separately.
 

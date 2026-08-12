@@ -286,6 +286,55 @@ P1-A ✅ · P1-B ✅ · P1-13 ✅ → remaining: P1-C quotes/RAG (P1-14→18), P
 
 ---
 
+**P1-17 — Approved-content pgvector RAG + queued grounded drafting — ✅ PASSED (12-Aug-2026)**
+
+### Built (`build/p1-17/app/`)
+
+- `knowledge.py` — PostgreSQL/pgvector document, chunk, embedding, retrieval,
+  draft-job and citation persistence; explicit approval/security/validity/scope
+  controls; HNSW + full-text hybrid retrieval; retrieval and transition audit.
+- `integrations/ollama/` — air-gapped Ollama adapter for `bge-m3` embeddings
+  and schema-constrained grounded `qwen3:14b` drafting.
+- `rag_drafting.py` / `rag_worker.py` — accepted validated quote facts remain
+  a separate authority from untrusted RAG language; generation is queue-only
+  and consumed by one worker.
+- FastAPI endpoints for document ingestion, human approval, approved retrieval,
+  retrieval history, draft enqueue and job status.
+- Compose configuration for one RAG worker and local model settings; no cloud
+  dependency or external-system implementation copied into the Orchestrator.
+
+### Acceptance evidence
+
+| Test | Result |
+|---|---|
+| Full P1-15/P1-16/P1-17 suite against disposable PostgreSQL 16 + pgvector | **40 passed** |
+| Approval/security/status/expiry/scope SQL prefilter | Only approved, cleared, in-scope content returned |
+| Hostile indirect-prompt content | Ingested `FLAGGED`; approval structurally refused |
+| Chunking | 600-word target, 90-word overlap; pricing rows atomic; repeated section provenance retained |
+| Citations/audit | document/version/status/section/page/source/hash/date/owner/score persisted; retrieval audited |
+| Commercial hallucination tripwire | Accepted `VALIDATED` quote facts passed separately; RAG supplies language only |
+| Queue boundary | API only enqueues; worker claims with `FOR UPDATE SKIP LOCKED` |
+| Live Local LLM adapter | `bge-m3` returned 1,024 dimensions; `qwen3:14b` returned grounded JSON using `[K1]` |
+| Compose/image security | Compose config valid; `/srv/app/.env` absent from image |
+
+### Operational notes
+
+- The administrator installed the official `bge-m3:latest` model on the frozen
+  Ollama service at `192.168.71.11`; the Orchestrator implementation itself did
+  not modify Local LLM configuration or Proposal Builder source.
+- The live smoke test uses synthetic approved language and synthetic validated
+  commercial facts. Production knowledge still requires separately authored
+  and human-approved source documents.
+- The physical Hyper-V host is `192.168.71.2`; the approved interim application,
+  PostgreSQL and local-model topology is the `aiinference` VM at `192.168.71.11`.
+
+### Next task
+
+**P1-18 — Multi-vendor / multi-quote comparison.** P1-14 historical dataset
+collection remains a parallel owner/data activity.
+
+---
+
 ## History — P1-01 blocked period (07-Aug, resolved 08-Aug)
 
 - Off-site laptop (10.212.134.200) had no route to the air-gapped 192.168.71.x segment; execution shifted to guided mode (Raghu's hands, Kimi's commands) — kept as the working pattern for VM-side tasks.
