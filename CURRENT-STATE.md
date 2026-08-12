@@ -8,11 +8,11 @@ Architecture v2.0 and Phase 0 are the implementation baseline.
 
 Current validated milestone:
 
-**P1-22 PASSED**
+**P1-23 PASSED**
 
 Validated implementation branch:
 
-`codex/p1-22-proposal-release-flow`
+`codex/p1-23-benchmark-harness`
 
 The exact task commit SHA is reported in the completion handoff after commit creation.
 
@@ -187,7 +187,7 @@ Those descriptions are historical and are not the current Orchestrator architect
 
 ## Known repository condition at handoff
 
-The active P1-22 implementation is under `build/p1-22/app/`. The legacy
+The active P1-23 implementation is under `build/p1-23/app/`. The legacy
 `nationlabs-orchestrator/` Flask/SQLite tree is not current.
 
 The frozen Proposal Builder repository had a pre-existing untracked overview
@@ -197,20 +197,19 @@ document during takeover. It was not modified or included in Orchestrator work.
 
 **P1-E - Benchmarking and security**
 
-P1-22 proposal release flow is **passed**. It prepares a gated release package
-from completed proposal artifacts, requires passing validation and final DOCX/PDF
-artifact hashes, records approval/artifact snapshots, and records human-controlled
-customer submission evidence without sending email or using any external channel.
+P1-23 benchmark harness is **passed**. It validates local labelled benchmark
+datasets, replays fixture predictions/evaluator outputs across extraction,
+classification, vendor-response classification and quote extraction cases,
+computes case/type metrics, persists reports and audit events, and clearly marks
+small sample runs as `INSUFFICIENT_DATA` until the real dataset exists.
 
+P1-24 model go/no-go remains blocked until the owner-provided P1-14 30-50
+labelled historical opportunities are available and run through the harness.
 P1-20 and P1-21 remain blocked/deferred until frozen Proposal Builder build
-output is available for TP/golden-fidelity validation. No Proposal Builder source
-was modified or copied.
+output is available.
 
-The exact next actionable engineering item is **P1-23 - Benchmark harness**,
-unless the Builder endpoint/output is supplied first.
-
-P1-14 historical dataset collection remains an owner/data activity that can
-continue separately.
+The exact next actionable engineering item is **P1-25 - Security hardening**,
+unless the historical benchmark dataset or Builder endpoint is supplied first.
 
 The next work should be performed only inside the Orchestrator and should respect the frozen external-system boundaries.
 

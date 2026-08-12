@@ -1,0 +1,86 @@
+{
+  "dataset_key": "p123-sample",
+  "name": "P1-23 sample labelled benchmark",
+  "cases": [
+    {
+      "case_id": "REQ-001",
+      "case_type": "requirement_extraction",
+      "input": {
+        "raw_text": "Customer ACME needs Fortinet firewall, 2 units, proposal due Aug 20."
+      },
+      "expected": {
+        "fields": {
+          "customer.customer_org": "ACME",
+          "customer.submission_deadline": "Aug 20",
+          "requirement.brand": "Fortinet",
+          "requirement.quantity": "2"
+        }
+      },
+      "prediction": {
+        "customer": {
+          "customer_org": "ACME",
+          "submission_deadline": "Aug 20"
+        },
+        "requirement": {
+          "brand": "Fortinet",
+          "quantity": "2"
+        }
+      }
+    },
+    {
+      "case_id": "CLS-001",
+      "case_type": "classification",
+      "input": {
+        "raw_text": "Commercial and technical proposal requested for firewall."
+      },
+      "expected": {
+        "label": "CP_TP"
+      },
+      "prediction": {
+        "label": "CP_TP"
+      }
+    },
+    {
+      "case_id": "VR-001",
+      "case_type": "vendor_response_classification",
+      "input": {
+        "raw_text": "Please find attached our quotation."
+      },
+      "expected": {
+        "label": "QUOTE"
+      },
+      "prediction": {
+        "label": "QUOTE"
+      }
+    },
+    {
+      "case_id": "QT-001",
+      "case_type": "quote_extraction",
+      "input": {
+        "filename": "vendor-quote.pdf"
+      },
+      "expected": {
+        "line_items": [
+          {
+            "part_number": "FG-100F",
+            "description": "FortiGate 100F",
+            "quantity": "2",
+            "unit_price": "10000.00",
+            "line_total": "20000.00"
+          }
+        ]
+      },
+      "prediction": {
+        "line_items": [
+          {
+            "part_number": "FG-100F",
+            "description": "FortiGate 100F",
+            "quantity": "2",
+            "unit_price": "10000.00",
+            "line_total": "20000.00"
+          }
+        ]
+      }
+    }
+  ]
+}

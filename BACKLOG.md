@@ -327,7 +327,7 @@ Acceptance:
 
 ## P1-23 — Benchmark harness
 
-Status: **PENDING**
+Status: **PASSED (12-Aug-2026) - harness ready**
 
 Replay the historical evaluation dataset against:
 - requirement extraction,
@@ -338,7 +338,9 @@ Replay the historical evaluation dataset against:
 - structured output validity.
 
 Acceptance:
-- automatic benchmark report generated.
+- automatic benchmark report generated,
+- dataset schema validation and persisted case-level results implemented,
+- production model sign-off remains blocked until the real 30-50 labelled historical dataset is supplied.
 
 ---
 
@@ -397,4 +399,4 @@ Until email integration exists:
 
 # Immediate next engineering task
 
-P1-20 and P1-21 remain blocked/deferred until frozen Proposal Builder build output is available. The next actionable open engineering item is **P1-23 — Benchmark harness**, unless the Builder endpoint is supplied first. P1-14 remains a parallel owner/data activity.
+Begin **P1-24 — Model go/no-go** only after the real P1-14 labelled historical dataset is available and the P1-23 harness has run it. Until then, the next actionable item is **P1-25 — Security hardening**. P1-20/P1-21 remain blocked/deferred until frozen Proposal Builder build output is available.

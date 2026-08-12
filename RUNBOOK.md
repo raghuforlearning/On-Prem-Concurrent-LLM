@@ -19,11 +19,11 @@ For current implementation decisions, use:
 
 Known-good milestone:
 
-**P1-22 PASSED**
+**P1-23 PASSED**
 
 Active implementation:
 
-`build/p1-22/app/`
+`build/p1-23/app/`
 
 Do not reset the repository to this commit automatically because the working tree contains uncommitted historical changes.
 
@@ -244,6 +244,15 @@ P1-22 operations:
 - repeated submission recording for the same release package is idempotent and
   returns the existing submission.
 
+P1-23 operations:
+- benchmark datasets are local JSON files; do not upload them to cloud services.
+- use `POST /benchmarks/run` with a local dataset path to generate and persist
+  the report.
+- sample or partial datasets intentionally return `INSUFFICIENT_DATA`; do not
+  use them for production model sign-off.
+- P1-24 requires the real P1-14 labelled historical dataset before a go/no-go
+  decision can be made.
+
 If a credential appears in a build log or shared archive, rotate it before production use.
 
 ## 12. Codex takeover sequence
@@ -264,9 +273,10 @@ Only after review should Codex begin P1-C implementation.
 
 ## 13. Current next engineering priority
 
-**P1-23 - Benchmark harness**
+**P1-25 - Security hardening**
 
-P1-20 and P1-21 remain blocked/deferred until frozen Proposal Builder build
-output is available. If the Builder endpoint arrives first, return to P1-20;
-otherwise proceed with the benchmark harness. P1-14 historical dataset collection
-can proceed in parallel as an owner/data activity.
+P1-24 model go/no-go requires the real P1-14 labelled historical dataset and a
+completed P1-23 benchmark run. P1-20 and P1-21 remain blocked/deferred until
+frozen Proposal Builder build output is available. If either missing input
+arrives first, return to that blocked item; otherwise proceed with security
+hardening.

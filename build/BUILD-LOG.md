@@ -5,6 +5,39 @@ Rules: one backlog item at a time · acceptance test must pass before next item 
 
 ---
 
+## P1-23 - Benchmark harness - PASSED, harness ready (12-Aug-2026)
+
+### Built (`build/p1-23/app/`)
+
+- `benchmarks.py` - local dataset validation, deterministic case metrics,
+  report summaries, Postgres persistence and audit events.
+- Dataset/run/case-result tables for `evaluation_dataset/test/result` style
+  evidence.
+- FastAPI endpoints for `POST /benchmarks/run` and `GET /benchmarks/runs`.
+- Sample labelled fixture covering requirement extraction, classification,
+  vendor-response classification and quote extraction.
+
+### Acceptance evidence
+
+| Test | Result |
+|---|---|
+| Pure P1-23 benchmark tests | **4 passed** |
+| Live P1-23 Postgres benchmark test | **1 passed** against disposable PostgreSQL 16 + pgvector |
+| Full P1-15-P1-23 snapshot suite | **51 passed, 14 skipped** against disposable PostgreSQL 16 + pgvector |
+| Automatic report | generated and persisted with dataset hash, metrics, case results and audit event |
+| Sign-off gating | sample dataset returns `INSUFFICIENT_DATA` until 30+ real labelled cases exist |
+
+Temporary Docker test database was removed after testing. No cloud AI/SaaS,
+Proposal Builder or Local LLM implementation/configuration was changed.
+
+### Next task
+
+P1-24 model go/no-go remains blocked until the real P1-14 30-50 labelled
+historical dataset is available and run through the harness. P1-20/P1-21 remain
+blocked/deferred until Builder output is available. The next actionable open item
+is **P1-25 - Security hardening**, unless those missing inputs arrive first.
+
+---
 ## P1-22 - Proposal release flow - PASSED (12-Aug-2026)
 
 ### Built (`build/p1-22/app/`)
