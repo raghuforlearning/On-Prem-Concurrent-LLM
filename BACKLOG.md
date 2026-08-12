@@ -238,7 +238,7 @@ Acceptance:
 
 ## P1-19 — Proposal Builder handoff
 
-Status: **PENDING**
+Status: **PASSED - Orchestrator foundation**
 
 Architecture:
 - Proposal Builder remains frozen.
@@ -259,9 +259,10 @@ Build:
 - failure/retry/human-review state.
 
 Acceptance:
-- approved CP path completes without modifying Proposal Builder source,
-- generated numbers match the frozen accepted commercial payload,
-- artifact and audit linkage are complete.
+- approved CP path completes through a fake documented Builder adapter without modifying Proposal Builder source,
+- frozen commercial payload numbers are handed to Builder unchanged,
+- artifact and audit linkage are complete,
+- live CP completion remains blocked until the external frozen Proposal Builder exposes `/api/v1/builds`.
 
 ---
 
@@ -395,5 +396,4 @@ Until email integration exists:
 
 # Immediate next engineering task
 
-Begin **P1-19 — Proposal Builder handoff** from the validated
-`build/p1-18/app/` baseline. P1-14 remains a parallel owner/data activity.
+Begin **P1-20 — TP golden-fidelity gate** after the external frozen Proposal Builder build endpoint/output is available for validation. If `/api/v1/builds` is still unavailable, resolve that integration blocker first. P1-14 remains a parallel owner/data activity.

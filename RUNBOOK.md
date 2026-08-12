@@ -215,6 +215,24 @@ P1-18 operations:
 - do not edit comparison run result JSON or a selection snapshot in-place;
   create a new comparison/selection decision with its own audit history.
 
+P1-19 operations:
+- proposal handoff is Orchestrator-only; do not modify or copy the Proposal
+  Builder implementation.
+- configure `PROPOSAL_BUILDER_BUILD_URL` only when the frozen Builder exposes
+  the documented `/api/v1/builds` contract. If unset, the Orchestrator falls
+  back to `PROPOSAL_BUILDER_URL`.
+- `POST /proposals/{type}/assemble` must have an active accepted quote,
+  current deterministic quote validation, approved `PROPOSAL_VALUE` approval
+  and a satisfied Deal Registration gate.
+- `POST /proposals/{id}/build` submits the frozen payload hash to Builder and
+  records the returned Builder job reference. A failed submission can be retried
+  without changing the frozen payload.
+- `POST /proposal-build-jobs/{id}/refresh` records returned artifact refs and
+  SHA-256 hashes. Missing artifact hashes quarantine the job for human review.
+- live CP completion is blocked until the external Builder endpoint is
+  available; the passed implementation validates the Orchestrator foundation
+  with the documented adapter contract.
+
 If a credential appears in a build log or shared archive, rotate it before production use.
 
 ## 12. Codex takeover sequence
@@ -235,8 +253,10 @@ Only after review should Codex begin P1-C implementation.
 
 ## 13. Current next engineering priority
 
-**P1-19 — Proposal Builder handoff**
+**P1-20 - TP golden-fidelity gate**
 
 P1-14 historical dataset collection can proceed in parallel as an owner/data activity.
 
-Do not modify the Proposal Builder itself.
+Start P1-20 only after the frozen Proposal Builder build endpoint/output is
+available for validation. If `/api/v1/builds` is unavailable, resolve that
+external integration blocker first. Do not modify the Proposal Builder itself.

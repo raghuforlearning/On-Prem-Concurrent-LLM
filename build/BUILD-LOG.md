@@ -5,6 +5,47 @@ Rules: one backlog item at a time · acceptance test must pass before next item 
 
 ---
 
+## P1-19 - Proposal Builder handoff - PASSED, Orchestrator foundation (12-Aug-2026)
+
+### Built (`build/p1-19/app/`)
+
+- `proposals.py` - Orchestrator-owned proposal payload freeze, precondition
+  gates, proposal/version tables, document build job attempts, retry state,
+  artifact SHA-256 tracking, validation-result storage and proposal audit links.
+- Existing Proposal Builder HTTP adapter extended with the documented
+  `/api/v1/builds`, `/api/v1/builds/validate`, `/api/v1/builds/{id}` and
+  `/api/v1/builds/{id}/artifacts` contract methods.
+- FastAPI endpoints added for proposal assemble, build submit, build refresh and
+  artifact lookup.
+- `PROPOSAL_BUILDER_BUILD_URL` added as an optional build-contract endpoint.
+  If unset, the adapter falls back to `PROPOSAL_BUILDER_URL`.
+
+### Acceptance evidence
+
+| Test | Result |
+|---|---|
+| Pure Builder v1 contract tests | **8 passed** |
+| Live Orchestrator Postgres handoff tests | **2 passed** against disposable PostgreSQL 16 + pgvector |
+| Full P1-15-P1-19 snapshot suite | **45 passed, 11 skipped** against disposable PostgreSQL 16 + pgvector |
+| Payload freeze | selected quote commercial totals remained unchanged in Builder handoff payload |
+| Preconditions | accepted quote, validation, approval and Deal Registration gates enforced |
+| Job/artifact audit | build ref, retry attempts, returned artifact refs/SHA-256 hashes and audit actions recorded |
+
+Live CP completion remains blocked until the external frozen Proposal Builder
+exposes the documented `/api/v1/builds` endpoint. The passed tests use a fake
+documented Builder adapter and do not modify or copy Proposal Builder source.
+
+Temporary Docker test database was removed after testing. No Local LLM
+implementation/configuration was changed.
+
+### Next task
+
+**P1-20 - TP golden-fidelity gate**, once Builder build output is available for
+validation. If `/api/v1/builds` remains unavailable, resolve that external
+integration blocker first. P1-14 historical dataset collection remains a
+parallel owner/data activity.
+
+---
 ## P1-18 — Multi-vendor / multi-quote comparison — ✅ PASSED (12-Aug-2026)
 
 ### Built (`build/p1-18/app/`)

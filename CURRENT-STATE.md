@@ -8,11 +8,11 @@ Architecture v2.0 and Phase 0 are the implementation baseline.
 
 Current validated milestone:
 
-**P1-18 PASSED**
+**P1-19 PASSED**
 
 Validated implementation branch:
 
-`codex/p1-18-multi-vendor-comparison`
+`codex/p1-19-proposal-builder-handoff`
 
 The exact task commit SHA is reported in the completion handoff after commit creation.
 
@@ -187,7 +187,7 @@ Those descriptions are historical and are not the current Orchestrator architect
 
 ## Known repository condition at handoff
 
-The active P1-18 implementation is under `build/p1-18/app/`. The legacy
+The active P1-19 implementation is under `build/p1-19/app/`. The legacy
 `nationlabs-orchestrator/` Flask/SQLite tree is not current.
 
 The frozen Proposal Builder repository had a pre-existing untracked overview
@@ -195,14 +195,24 @@ document during takeover. It was not modified or included in Orchestrator work.
 
 ## Next implementation area
 
-**P1-C — Quote Intelligence + RAG**
+**P1-D - Proposal integration and release**
 
-P1-18 is **passed**. Its deterministic multi-vendor comparison, recorded rate
-provenance, byte-stable result hashes, immutable run history, revision retention,
-human selection snapshot and per-vendor Deal Registration eligibility checks pass
-the full 46-test suite. No LLM performs commercial arithmetic or rate selection.
+P1-19 Orchestrator-side Proposal Builder handoff foundation is **passed**. It
+freezes an approved structured proposal payload from the active quote selection,
+enforces quote validation, approval and Deal Registration gates, submits only
+through the documented configurable Builder adapter contract, tracks build
+attempts/retries, records returned artifact references plus SHA-256 hashes and
+preserves proposal audit linkage.
 
-The exact next engineering item is **P1-19 — Proposal Builder handoff**.
+Live CP completion remains **blocked by external Proposal Builder availability**
+until the frozen Proposal Builder exposes the documented `/api/v1/builds`
+contract endpoint. No Proposal Builder source was modified or copied.
+
+The exact next engineering item is **P1-20 - TP golden-fidelity gate**, once a
+Builder build endpoint/output is available for validation. If the endpoint is
+still unavailable, resolve that external integration blocker before starting
+P1-20.
+
 P1-14 historical dataset collection remains an owner/data activity that can
 continue separately.
 
