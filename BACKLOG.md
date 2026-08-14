@@ -400,4 +400,17 @@ Until email integration exists:
 
 # Immediate next engineering task
 
-All currently actionable Orchestrator P1 items are complete through P1-25. Remaining blocked/deferred items: P1-20/P1-21 require frozen Proposal Builder build output; P1-24 requires the real P1-14 labelled historical dataset benchmark run. Next action is to supply one of those external inputs or start production deployment hardening/ops validation.
+All currently actionable Orchestrator P1 items are complete through P1-25.
+
+Production UAT preparation is now documented/configurable:
+- compose endpoint overrides for production `.env` values,
+- production-safe `.env.example` placeholders,
+- `docs/Orchestrator-Production-UAT-Runbook.md`.
+
+Next action is to deploy `build/p1-25/app` to the production server as internal
+UAT only, then record smoke-test evidence. Business-live remains blocked until:
+- P1-20/P1-21 receive frozen Proposal Builder build output or are explicitly
+  waived/deferred by the business,
+- P1-24 is run against the real P1-14 labelled historical dataset,
+- production backup/restore and security operations are validated on the target
+  servers.

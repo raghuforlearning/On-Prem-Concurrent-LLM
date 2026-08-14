@@ -10,6 +10,10 @@ Current validated milestone:
 
 **P1-25 PASSED**
 
+Production-server UAT preparation:
+
+**P1-OPS-UAT-PREP DONE (14-Aug-2026)**
+
 Validated implementation branch:
 
 `codex/p1-25-security-hardening`
@@ -210,6 +214,17 @@ Remaining blocked/deferred items:
   remain deployment/operations activities.
 
 The next work should be performed only inside the Orchestrator and should respect the frozen external-system boundaries.
+
+Production UAT preparation has been added without changing frozen external
+systems:
+- `build/p1-25/app/docker-compose.yml` now allows `.env` overrides for the
+  Orchestrator HTTP port, PostgreSQL host/port/database and Ollama endpoint.
+- `build/p1-25/app/.env.example` documents the production-safe placeholders.
+- `docs/Orchestrator-Production-UAT-Runbook.md` defines the production-server
+  UAT deployment sequence, smoke checks, rollback and business-live gates.
+
+This enables an internal UAT deployment on `192.168.71.2`, but production-live
+remains gated by the pending Builder/dataset/ops validations listed below.
 
 ## Owner inputs still pending
 

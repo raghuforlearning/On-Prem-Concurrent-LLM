@@ -8,15 +8,15 @@ services:
     container_name: nl-api
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "${ORCHESTRATOR_HTTP_PORT:-8080}:8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - rfp-archive:/srv/data/rfp_archive   # originals preserved byte-for-byte
       - quote-archive:/srv/data/quote_archive # raw vendor quotes, content-addressed
     environment:
-      PG_DSN: postgresql://orchestrator_app:${PG_APP_PASSWORD}@host.docker.internal:5432/orchestrator
-      OLLAMA_URL: http://host.docker.internal:11434
+      PG_DSN: postgresql://orchestrator_app:${PG_APP_PASSWORD}@${PG_HOST:-host.docker.internal}:${PG_PORT:-5432}/${PG_DATABASE:-orchestrator}
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       ANALYSIS_MODEL: qwen3:14b
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-bge-m3}
       RAG_DRAFT_MODEL: ${RAG_DRAFT_MODEL:-qwen3:14b}
@@ -44,8 +44,8 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      PG_DSN: postgresql://orchestrator_app:${PG_APP_PASSWORD}@host.docker.internal:5432/orchestrator
-      OLLAMA_URL: http://host.docker.internal:11434
+      PG_DSN: postgresql://orchestrator_app:${PG_APP_PASSWORD}@${PG_HOST:-host.docker.internal}:${PG_PORT:-5432}/${PG_DATABASE:-orchestrator}
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-bge-m3}
       RAG_DRAFT_MODEL: ${RAG_DRAFT_MODEL:-qwen3:14b}
       RAG_OLLAMA_TIMEOUT_S: ${RAG_OLLAMA_TIMEOUT_S:-300}

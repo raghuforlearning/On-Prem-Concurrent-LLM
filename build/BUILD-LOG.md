@@ -5,6 +5,45 @@ Rules: one backlog item at a time · acceptance test must pass before next item 
 
 ---
 
+## P1-OPS-UAT-PREP - Production-server UAT preparation (14-Aug-2026)
+
+### Built / changed
+
+- `build/p1-25/app/docker-compose.yml` now supports production `.env` overrides
+  for:
+  - `ORCHESTRATOR_HTTP_PORT`
+  - `PG_HOST`
+  - `PG_PORT`
+  - `PG_DATABASE`
+  - `OLLAMA_URL`
+- `build/p1-25/app/.env.example` now documents the production-safe placeholders
+  for PostgreSQL, Orchestrator port, Ollama and Proposal Builder build URL.
+- `docs/Orchestrator-Production-UAT-Runbook.md` added with the internal UAT
+  topology, `.env` checklist, start commands, smoke checks, rollback and
+  production-live gates.
+- `RUNBOOK.md`, `CURRENT-STATE.md` and `BACKLOG.md` updated to point to the UAT
+  runbook and preserve the external-input gates.
+
+### Validation evidence
+
+| Check | Result |
+|---|---|
+| Docker Compose render with `.env.example` | **Passed** |
+| Container regression tests | **68 passed, 15 skipped** via `python -m unittest discover -s tests` |
+| Frozen-system boundary | No Local LLM or Proposal Builder source modified |
+
+### Notes
+
+- This is deployment preparation, not production-live sign-off.
+- UAT can run on `192.168.71.2` with `OLLAMA_URL` set to the approved internal
+  Ollama endpoint, currently expected as `http://192.168.71.11:11434` if the AI
+  inference VM remains the model host.
+- Business-live remains blocked by Proposal Builder build output availability,
+  the real P1-14 benchmark dataset/P1-24 go-no-go, and production operations
+  validation such as backup/restore and security tooling.
+
+---
+
 ## P1-25 - Security hardening - PASSED, Orchestrator controls (12-Aug-2026)
 
 ### Built (`build/p1-25/app/`)

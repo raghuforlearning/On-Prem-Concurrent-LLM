@@ -295,3 +295,12 @@ P1-20/P1-21 need frozen Proposal Builder build output, and P1-24 needs the real
 P1-14 labelled historical dataset benchmark run. Production security operations
 such as ClamAV/Wazuh/full isolated restore drills must be validated on the target
 servers before production sign-off.
+
+For internal production-server UAT deployment, use:
+
+```text
+docs/Orchestrator-Production-UAT-Runbook.md
+```
+
+The UAT deployment may run on the production server before business-live, but it
+must remain clearly marked as UAT until the live gates in that runbook are met.
