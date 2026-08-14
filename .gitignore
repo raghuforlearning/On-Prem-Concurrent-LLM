@@ -12,6 +12,10 @@ Thumbs.db
 *.log
 logs/
 
+# Owner-supplied historical benchmark data is sensitive and local-only.
+build/p1-25/app/local-historical-dataset/
+outputs/
+
 # Python test/runtime caches
 __pycache__/
 *.py[cod]

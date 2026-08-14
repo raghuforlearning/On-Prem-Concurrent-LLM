@@ -1,5 +1,17 @@
 # NationLabs AI Presales Orchestrator — Production UAT Runbook
 
+## Current deployment hold — 14-Aug-2026
+
+UAT remains on the administrator's local Docker Desktop until the Orchestrator
+is production-ready. The Hyper-V host had only 4.1 GB available RAM during the
+latest assessment, so it cannot safely host the recommended dedicated 16 GB
+Orchestrator VM today.
+
+Do not work around this constraint by installing Orchestrator services inside
+the frozen AI Inference or Proposal Builder VMs. Resume this runbook after host
+capacity is expanded or at least 20–24 GB is safely reclaimed and a dedicated
+Orchestrator VM is approved.
+
 ## Scope
 
 This runbook prepares the active Orchestrator implementation for internal UAT on

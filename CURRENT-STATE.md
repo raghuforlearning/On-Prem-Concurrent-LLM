@@ -14,6 +14,10 @@ Production-server UAT preparation:
 
 **P1-OPS-UAT-PREP DONE (14-Aug-2026)**
 
+Historical-dataset collection tooling:
+
+**P1-14 TOOLING PASSED (14-Aug-2026); OWNER DATA COLLECTION PENDING**
+
 Validated implementation branch:
 
 `codex/p1-25-security-hardening`
@@ -213,6 +217,10 @@ Remaining blocked/deferred items:
 - Production ops controls such as ClamAV/Wazuh/full isolated restore drills
   remain deployment/operations activities.
 
+The P1-14 owner-data activity now has a committed collection pack, human label
+workbook, fail-closed validator and completeness report. P1-14 is not fully
+accepted until at least 30 real deals are collected and second-person validated.
+
 The next work should be performed only inside the Orchestrator and should respect the frozen external-system boundaries.
 
 Production UAT preparation has been added without changing frozen external
@@ -223,8 +231,12 @@ systems:
 - `docs/Orchestrator-Production-UAT-Runbook.md` defines the production-server
   UAT deployment sequence, smoke checks, rollback and business-live gates.
 
-This enables an internal UAT deployment on `192.168.71.2`, but production-live
-remains gated by the pending Builder/dataset/ops validations listed below.
+This enables a future internal deployment on `192.168.71.2`, but the current
+UAT remains local in Docker. The 14-Aug-2026 Hyper-V check found only 4.1 GB
+available host RAM, so a dedicated Orchestrator VM is deferred until the system
+is production-ready and host capacity is expanded or safely reclaimed. Do not
+co-host Orchestrator services inside the frozen AI Inference or Proposal Builder
+VMs as a workaround.
 
 ## Owner inputs still pending
 

@@ -36,7 +36,24 @@ The P1-18 task commit SHA is reported in the completion handoff.
 
 ## P1-14 — Historical evaluation dataset pack
 
-Status: **NEXT / OWNER INPUT + TOOLING**
+Status: **TOOLING PASSED (14-Aug-2026) / OWNER COLLECTION PENDING**
+
+Validation evidence:
+- `build/p1-25/app/historical_dataset.py` creates the approved idempotent
+  `deal-NNN/{rfp,rfq,quotes,costing,proposal,outcome}` structure, copies the
+  blank workbook without overwriting evidence, validates labels/artifacts and
+  writes a machine-readable completeness report.
+- `build/p1-25/app/dataset_pack/labels-template.xlsx` provides human-editable
+  `Deals`, `Requirement Truth`, `Quote Truth` and `Security Cases` sheets with
+  controlled lists, review metadata and a visible row-completeness indicator.
+- synthetic acceptance pack: 30/30 complete deals passed schema/artifact
+  validation and all target-mix checks; removal of one quote artifact plus a
+  `DRAFT` label failed closed at 29/30.
+- full active snapshot: 71 tests run against disposable PostgreSQL 16/pgvector,
+  70 passed and the opt-in live Ollama test was skipped; offline image suite
+  ran 71 tests with 15 environment-dependent skips.
+- real NationLabs evidence was not added to Git. Generated/populated collection
+  folders are excluded from both Git and the Docker build context.
 
 Build:
 - folder/validation tooling for historical opportunity dataset,
@@ -57,6 +74,11 @@ Target dataset:
 
 Acceptance:
 - at least 30 complete labelled deals pass schema validation before model benchmark sign-off.
+
+Current acceptance state:
+- tooling acceptance is passed;
+- model benchmark sign-off remains blocked until the owner supplies and a
+  second presales reviewer validates at least 30 real historical deals.
 
 Important:
 - do not block independent P1-C engineering while the full dataset is being collected.
@@ -407,8 +429,12 @@ Production UAT preparation is now documented/configurable:
 - production-safe `.env.example` placeholders,
 - `docs/Orchestrator-Production-UAT-Runbook.md`.
 
-Next action is to deploy `build/p1-25/app` to the production server as internal
-UAT only, then record smoke-test evidence. Business-live remains blocked until:
+The Orchestrator remains in local Docker UAT while the Hyper-V host has only
+4.1 GB available RAM. Production-server deployment is deferred until the
+application is production-ready and dedicated VM capacity is approved.
+
+Immediate next action is owner collection/review of the real P1-14 dataset,
+using the committed pack. Business-live remains blocked until:
 - P1-20/P1-21 receive frozen Proposal Builder build output or are explicitly
   waived/deferred by the business,
 - P1-24 is run against the real P1-14 labelled historical dataset,

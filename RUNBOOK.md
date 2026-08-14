@@ -253,6 +253,18 @@ P1-23 operations:
 - P1-24 requires the real P1-14 labelled historical dataset before a go/no-go
   decision can be made.
 
+P1-14 collection operations:
+- from `build/p1-25/app`, run
+  `python historical_dataset.py init --root .\local-historical-dataset --count 30`;
+- keep real deal evidence and populated labels inside that ignored local folder;
+- use `dataset_pack/README.md` and the copied `labels.xlsx` for second-person
+  validation;
+- run `python historical_dataset.py validate --root .\local-historical-dataset
+  --report .\local-historical-dataset\completeness-report.json`;
+- exit code `2` is expected until 30 complete validated deals pass; use
+  `--allow-incomplete` only for progress reporting, never for P1-24 sign-off;
+- do not commit or bake real customer/vendor artifacts into a Docker image.
+
 P1-25 operations:
 - use `POST /security/files/scan` for local file screening decisions before
   processing suspicious uploads.
@@ -296,7 +308,12 @@ P1-14 labelled historical dataset benchmark run. Production security operations
 such as ClamAV/Wazuh/full isolated restore drills must be validated on the target
 servers before production sign-off.
 
-For internal production-server UAT deployment, use:
+The current UAT stays local in Docker. The 14-Aug-2026 Hyper-V assessment found
+4.1 GB available RAM, which is insufficient for the recommended dedicated
+Orchestrator VM. Do not place the Orchestrator inside the frozen AI Inference or
+Proposal Builder VMs. Reassess capacity when the system is production-ready.
+
+For the later dedicated-server deployment, use:
 
 ```text
 docs/Orchestrator-Production-UAT-Runbook.md

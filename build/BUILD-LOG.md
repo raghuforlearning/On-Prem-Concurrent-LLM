@@ -5,6 +5,50 @@ Rules: one backlog item at a time · acceptance test must pass before next item 
 
 ---
 
+## P1-14 - Historical evaluation dataset tooling - TOOLING PASSED (14-Aug-2026)
+
+### Built (`build/p1-25/app/`)
+
+- `historical_dataset.py` - idempotent 30-50 deal collection-folder generator,
+  strict workbook/schema/artifact validator, coverage analysis and JSON
+  completeness-report writer.
+- `dataset_pack/labels-template.xlsx` - reviewed workbook with `Deals`,
+  `Requirement Truth`, `Quote Truth`, `Security Cases`, instructions and
+  controlled lists. Human-validation metadata and row readiness are visible.
+- `dataset_pack/README.md` - air-gapped collection and validation procedure.
+- `tests/test_p114_historical_dataset.py` - synthetic 30-deal acceptance,
+  no-overwrite/idempotency and fail-closed incomplete-data tests.
+- Real owner evidence remains local-only: `local-historical-dataset/` is
+  excluded from Git and the Docker build context.
+
+### Acceptance evidence
+
+| Check | Result |
+|---|---|
+| P1-14 focused suite | **3 passed** |
+| Synthetic acceptance dataset | **30/30 complete**, all target-mix checks passed |
+| Fail-closed regression | Missing quote artifact + `DRAFT` review state produced **29/30**, sign-off false |
+| Full PostgreSQL 16/pgvector suite | **71 tests run: 70 passed, 1 opt-in live-Ollama test skipped** |
+| Offline image regression suite | **71 tests run, 15 environment-dependent skips** |
+| Compose render | **Passed** with `.env.example` |
+| Frozen-system boundary | No Local LLM or Proposal Builder source/configuration changed |
+
+The disposable PostgreSQL container, isolated network and test image were
+removed after validation. The workbook was inspected for formula errors and
+all six sheets were rendered for visual verification.
+
+### Remaining owner gate
+
+P1-14 is not fully accepted and P1-24 remains blocked until Raghu supplies at
+least 30 real historical deals and a second presales reviewer validates the
+labels. No synthetic data may be used for the production model go/no-go.
+
+The production-server UAT deployment is also deferred. The current Hyper-V host
+had only 4.1 GB available RAM, so UAT remains local until the application is
+production-ready and dedicated VM capacity is approved.
+
+---
+
 ## P1-OPS-UAT-PREP - Production-server UAT preparation (14-Aug-2026)
 
 ### Built / changed
@@ -35,9 +79,9 @@ Rules: one backlog item at a time · acceptance test must pass before next item 
 ### Notes
 
 - This is deployment preparation, not production-live sign-off.
-- UAT can run on `192.168.71.2` with `OLLAMA_URL` set to the approved internal
-  Ollama endpoint, currently expected as `http://192.168.71.11:11434` if the AI
-  inference VM remains the model host.
+- The package can later deploy under `192.168.71.2` with `OLLAMA_URL` set to the
+  approved internal Ollama endpoint. Actual deployment is now held because the
+  host had only 4.1 GB available RAM; local Docker remains the current UAT.
 - Business-live remains blocked by Proposal Builder build output availability,
   the real P1-14 benchmark dataset/P1-24 go-no-go, and production operations
   validation such as backup/restore and security tooling.
