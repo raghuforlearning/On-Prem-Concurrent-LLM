@@ -14,6 +14,7 @@ services:
     volumes:
       - rfp-archive:/srv/data/rfp_archive   # originals preserved byte-for-byte
       - quote-archive:/srv/data/quote_archive # raw vendor quotes, content-addressed
+      - proposal-artifacts:/srv/data/proposal_artifacts # frozen Builder outputs + hashes
     environment:
       PG_DSN: postgresql://orchestrator_app:${PG_APP_PASSWORD}@${PG_HOST:-host.docker.internal}:${PG_PORT:-5432}/${PG_DATABASE:-orchestrator}
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
@@ -23,6 +24,9 @@ services:
       RAG_OLLAMA_TIMEOUT_S: ${RAG_OLLAMA_TIMEOUT_S:-300}
       PROPOSAL_BUILDER_URL: ${PROPOSAL_BUILDER_URL:-http://host.docker.internal:3000}
       PROPOSAL_BUILDER_BUILD_URL: ${PROPOSAL_BUILDER_BUILD_URL:-}
+      PROPOSAL_BUILDER_BUILD_TRANSPORT: ${PROPOSAL_BUILDER_BUILD_TRANSPORT:-existing_sync}
+      PROPOSAL_BUILDER_ARTIFACT_ROOT: ${PROPOSAL_BUILDER_ARTIFACT_ROOT:-/srv/data/proposal_artifacts}
+      PROPOSAL_BUILDER_SOURCE_ARTIFACT_ROOTS: ${PROPOSAL_BUILDER_SOURCE_ARTIFACT_ROOTS:-/srv/data/rfp_archive,/srv/data/quote_archive,/srv/data/proposal_artifacts}
       PROPOSAL_BUILDER_USERNAME: ${PROPOSAL_BUILDER_USERNAME:-}
       PROPOSAL_BUILDER_PASSWORD: ${PROPOSAL_BUILDER_PASSWORD:-}
       PROPOSAL_BUILDER_TIMEOUT_S: ${PROPOSAL_BUILDER_TIMEOUT_S:-120}
@@ -54,3 +58,4 @@ services:
 volumes:
   rfp-archive:
   quote-archive:
+  proposal-artifacts:

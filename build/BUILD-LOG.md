@@ -5,6 +5,46 @@ Rules: one backlog item at a time · acceptance test must pass before next item 
 
 ---
 
+## P1-19 - Live existing Proposal Builder transport - PASSED (18-Aug-2026)
+
+### Built (`build/p1-25/app/`)
+
+- Added an Orchestrator adapter for the frozen Builder's existing authenticated
+  synchronous API; no Builder source or runtime configuration was changed.
+- CP and NationLabs-owned AMC use the existing `/api/generate` route.
+- TP uses the existing `/api/generate-tp-vendor` multipart route and requires a
+  source PDF/DOCX from a configured controlled local artifact root.
+- TP source artifact path, type, size and SHA-256 are validated before upload.
+- Returned DOCX files and metadata are atomically archived in the
+  `proposal-artifacts` Docker volume with payload and artifact hashes.
+- Added `existing_sync`/`v1_async` transport selection and the read-only
+  `/integrations/proposal-builder/build-health` endpoint.
+- Added offline contract/security tests and an opt-in live CP/TP/AMC acceptance
+  test. Credentials remain only in the ignored `.env` file.
+
+### Acceptance evidence
+
+| Check | Result |
+|---|---|
+| Focused P1-19 adapter/proposal suite | **14 passed** |
+| Live frozen Builder CP/TP/AMC test | **1 passed** |
+| Full suite with disposable PostgreSQL + live Ollama + live Builder | **78 passed, 0 failed** |
+| Live CP DOCX | **438,597 bytes**, SHA-256 verified |
+| Live TP DOCX | **1,533,210 bytes**, source and result SHA-256 verified |
+| Live AMC DOCX | **293,064 bytes**, SHA-256 verified |
+| Runtime health | API healthy; Builder `UAT`, transport `existing_sync` |
+| Frozen-system boundary | No Local LLM or Proposal Builder source/configuration changed |
+
+### Remaining gates
+
+- P1-20 TP golden-fidelity/visual regression is now the next actionable item.
+- The synchronous Builder returns DOCX only. The P1-22 release package remains
+  fail-closed until the required final PDF artifact is available and hashed.
+- P1-21 remains deferred until P1-20 determines whether a rendering worker is
+  required.
+
+---
+
 ## P1-14 - Historical evaluation dataset tooling - TOOLING PASSED (14-Aug-2026)
 
 ### Built (`build/p1-25/app/`)

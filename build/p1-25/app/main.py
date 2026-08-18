@@ -23,7 +23,11 @@ import proposals as proposal_store
 import benchmarks as benchmark_store
 import security as security_store
 from vendors import init_vendors
-from integrations.proposal_builder import BuilderError, ProposalBuilderClient
+from integrations.proposal_builder import (
+    BuilderError,
+    ExistingProposalBuilderClient,
+    ProposalBuilderClient,
+)
 from quote_lifecycle import QuoteArchive, QuoteIngestionService
 from quote_validation import CommercialClaims, ValidationPolicy
 from integrations.ollama import OllamaClient
@@ -274,12 +278,42 @@ def _proposal_builder_quote_client() -> ProposalBuilderClient:
 
 
 def _proposal_builder_build_client() -> ProposalBuilderClient:
-    return ProposalBuilderClient(
+    base_url = (
         os.environ.get("PROPOSAL_BUILDER_BUILD_URL")
-        or os.environ.get("PROPOSAL_BUILDER_URL", ""),
-        os.environ.get("PROPOSAL_BUILDER_USERNAME", ""),
-        os.environ.get("PROPOSAL_BUILDER_PASSWORD", ""),
-        timeout_s=float(os.environ.get("PROPOSAL_BUILDER_TIMEOUT_S", "120")),
+        or os.environ.get("PROPOSAL_BUILDER_URL", "")
+    )
+    username = os.environ.get("PROPOSAL_BUILDER_USERNAME", "")
+    password = os.environ.get("PROPOSAL_BUILDER_PASSWORD", "")
+    timeout_s = float(os.environ.get("PROPOSAL_BUILDER_TIMEOUT_S", "120"))
+    transport = os.environ.get("PROPOSAL_BUILDER_BUILD_TRANSPORT", "existing_sync").strip().lower()
+    if transport == "existing_sync":
+        source_roots = [
+            item.strip()
+            for item in os.environ.get(
+                "PROPOSAL_BUILDER_SOURCE_ARTIFACT_ROOTS",
+                "/srv/data/rfp_archive,/srv/data/quote_archive,/srv/data/proposal_artifacts",
+            ).split(",")
+            if item.strip()
+        ]
+        return ExistingProposalBuilderClient(
+            base_url,
+            username,
+            password,
+            artifact_root=os.environ.get(
+                "PROPOSAL_BUILDER_ARTIFACT_ROOT", "/srv/data/proposal_artifacts"
+            ),
+            source_artifact_roots=source_roots,
+            timeout_s=timeout_s,
+        )
+    if transport != "v1_async":
+        raise ValueError(
+            "PROPOSAL_BUILDER_BUILD_TRANSPORT must be v1_async or existing_sync"
+        )
+    return ProposalBuilderClient(
+        base_url,
+        username,
+        password,
+        timeout_s=timeout_s,
     )
 
 
@@ -294,6 +328,26 @@ def proposal_builder_health():
         return {"status": "degraded", "error_code": exc.code, "detail": str(exc)}
     finally:
         client.close()
+
+
+@app.get("/integrations/proposal-builder/build-health")
+def proposal_builder_build_health():
+    if not (os.environ.get("PROPOSAL_BUILDER_BUILD_URL") or os.environ.get("PROPOSAL_BUILDER_URL")):
+        return {"status": "unconfigured"}
+    try:
+        client = _proposal_builder_build_client()
+        result = client.health()
+        result["transport"] = getattr(client, "transport", "v1_async")
+        return result
+    except (BuilderError, ValueError) as exc:
+        return {
+            "status": "degraded",
+            "error_code": getattr(exc, "code", "BUILDER_CONFIGURATION_INVALID"),
+            "detail": str(exc),
+        }
+    finally:
+        if "client" in locals():
+            client.close()
 
 
 @app.post("/rfqs/{rfq_ref}/quotes")

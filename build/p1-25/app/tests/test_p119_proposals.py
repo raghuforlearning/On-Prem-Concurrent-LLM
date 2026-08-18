@@ -88,6 +88,7 @@ class ProposalApiSurfaceTests(unittest.TestCase):
             '@app.post("/proposals/{proposal_id}/build")',
             '@app.post("/proposal-build-jobs/{build_job_id}/refresh")',
             '@app.get("/proposals/{proposal_id}/artifacts")',
+            '@app.get("/integrations/proposal-builder/build-health")',
         ):
             self.assertIn(route, source)
         p119_region = source.split("# ---------- P1-19", 1)[1].split("# ---------- P1-17", 1)[0]

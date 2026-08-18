@@ -218,9 +218,18 @@ P1-18 operations:
 P1-19 operations:
 - proposal handoff is Orchestrator-only; do not modify or copy the Proposal
   Builder implementation.
-- configure `PROPOSAL_BUILDER_BUILD_URL` only when the frozen Builder exposes
-  the documented `/api/v1/builds` contract. If unset, the Orchestrator falls
-  back to `PROPOSAL_BUILDER_URL`.
+- set `PROPOSAL_BUILDER_BUILD_TRANSPORT=existing_sync` for the currently
+  validated frozen Builder. It uses `/api/generate` for CP/AMC and
+  `/api/generate-tp-vendor` for TP. Keep `v1_async` only for a future Builder
+  service that implements the documented `/api/v1/builds` job contract.
+- configure `PROPOSAL_BUILDER_URL`, service credentials,
+  `PROPOSAL_BUILDER_ARTIFACT_ROOT` and
+  `PROPOSAL_BUILDER_SOURCE_ARTIFACT_ROOTS` through the ignored `.env` file.
+  Never commit the credentials.
+- TP requires `context.proposal_builder.vendor_tp_artifact` with a local
+  `artifact_ref`, SHA-256 and optional filename. The adapter accepts only PDF or
+  DOCX files inside the configured controlled roots, verifies size and hash,
+  then uploads the file to the frozen Builder.
 - `POST /proposals/{type}/assemble` must have an active accepted quote,
   current deterministic quote validation, approved `PROPOSAL_VALUE` approval
   and a satisfied Deal Registration gate.
@@ -229,9 +238,11 @@ P1-19 operations:
   without changing the frozen payload.
 - `POST /proposal-build-jobs/{id}/refresh` records returned artifact refs and
   SHA-256 hashes. Missing artifact hashes quarantine the job for human review.
-- live CP completion is blocked until the external Builder endpoint is
-  available; the passed implementation validates the Orchestrator foundation
-  with the documented adapter contract.
+- `GET /integrations/proposal-builder/build-health` must report `status=ok`,
+  `build_transport=existing_sync`, `build_endpoint=/api/generate` and
+  `tp_build_endpoint=/api/generate-tp-vendor` before live generation.
+- the existing synchronous transport returns DOCX only. P1-22 release remains
+  fail-closed until a final SHA-256-tracked PDF also exists.
 
 P1-22 operations:
 - proposal release is human-controlled. The Orchestrator records release
@@ -301,9 +312,9 @@ Only after review should Codex begin P1-C implementation.
 
 **External-input gated**
 
-All currently actionable Orchestrator P1 implementation items are complete
-through P1-25. Remaining blocked/deferred work requires external inputs:
-P1-20/P1-21 need frozen Proposal Builder build output, and P1-24 needs the real
+The Orchestrator P1 foundation is complete through P1-25. Remaining work is:
+P1-20 can now use live frozen Proposal Builder TP output. P1-21 remains deferred
+until that fidelity assessment proves it is required, and P1-24 needs the real
 P1-14 labelled historical dataset benchmark run. Production security operations
 such as ClamAV/Wazuh/full isolated restore drills must be validated on the target
 servers before production sign-off.

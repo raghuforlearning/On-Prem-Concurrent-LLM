@@ -7,6 +7,7 @@ from .client import (
     BuilderUnavailableError,
     ProposalBuilderClient,
 )
+from .existing import ExistingProposalBuilderClient
 from .schemas import QuoteContractError, QuoteExtractionResult, QuoteLine
 
 __all__ = [
@@ -14,6 +15,7 @@ __all__ = [
     "BuilderError",
     "BuilderQuoteRejected",
     "BuilderUnavailableError",
+    "ExistingProposalBuilderClient",
     "ProposalBuilderClient",
     "QuoteContractError",
     "QuoteExtractionResult",

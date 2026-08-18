@@ -68,6 +68,9 @@ RAG_WORKER_POLL_S=2
 
 PROPOSAL_BUILDER_URL=<approved internal Proposal Builder URL>
 PROPOSAL_BUILDER_BUILD_URL=
+PROPOSAL_BUILDER_BUILD_TRANSPORT=existing_sync
+PROPOSAL_BUILDER_ARTIFACT_ROOT=/srv/data/proposal_artifacts
+PROPOSAL_BUILDER_SOURCE_ARTIFACT_ROOTS=/srv/data/rfp_archive,/srv/data/quote_archive,/srv/data/proposal_artifacts
 PROPOSAL_BUILDER_USERNAME=<approved service account>
 PROPOSAL_BUILDER_PASSWORD=<approved service-account password>
 PROPOSAL_BUILDER_TIMEOUT_S=120
@@ -79,7 +82,10 @@ QUOTE_VALIDATION_REQUIRE_VAT=false
 QUOTE_VALIDATION_REQUIRED_TERMS=
 ```
 
-Set `PROPOSAL_BUILDER_BUILD_URL` only after the frozen Builder exposes the
+Use `existing_sync` for the validated frozen Builder. It calls the existing
+`/api/generate` and `/api/generate-tp-vendor` routes and archives returned DOCX
+files in the Orchestrator volume. Use `v1_async` and set
+`PROPOSAL_BUILDER_BUILD_URL` only if a future Builder service exposes the
 documented `/api/v1/builds` contract.
 
 ## Pre-deployment checks
@@ -129,6 +135,7 @@ Health check:
 
 ```bash
 curl http://192.168.71.2:8080/healthz
+curl http://192.168.71.2:8080/integrations/proposal-builder/build-health
 ```
 
 The API should report PostgreSQL as healthy. Ollama should report healthy when
@@ -149,9 +156,14 @@ Minimum smoke test sequence:
 9. Validate quote totals and readiness status.
 10. If multiple quotes exist, run comparison and record human selection.
 11. Assemble proposal payload only after required gates pass.
-12. Do not expect live CP/TP build completion until the frozen Proposal Builder
-    `/api/v1/builds` endpoint is available.
-13. Record a restore verification evidence event after backup/restore testing.
+12. Generate CP and AMC through the existing synchronous Builder transport.
+13. For TP, select a supplier TP PDF/DOCX already archived under a controlled
+    Orchestrator artifact root and include its artifact ref and SHA-256 in the
+    frozen proposal context.
+14. Confirm each returned DOCX is archived with a matching SHA-256. Do not treat
+    the DOCX-only result as a release-ready package until the required PDF is
+    also present.
+15. Record a restore verification evidence event after backup/restore testing.
 
 ## Production-live gates
 
@@ -159,8 +171,10 @@ Do not promote from UAT to business-live until all gates below are satisfied:
 
 - P1-14 historical dataset is available and schema-complete.
 - P1-24 model go/no-go has passed using the P1-23 benchmark harness.
-- Frozen Proposal Builder build endpoint is available for CP/TP output, or the
-  business explicitly accepts recorded-artifact release flow limitations.
+- P1-20 TP golden-fidelity has passed using frozen Proposal Builder output.
+- The final PDF path required by the release gate is validated, or the business
+  explicitly accepts a documented DOCX-only UAT limitation without treating it
+  as production release readiness.
 - Backup/PITR and isolated restore drill are completed and recorded.
 - File security operations are installed and validated on the target servers
   where required, including ClamAV/Wazuh if they are part of the approved ops

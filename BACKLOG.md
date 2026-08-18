@@ -260,7 +260,7 @@ Acceptance:
 
 ## P1-19 — Proposal Builder handoff
 
-Status: **PASSED - Orchestrator foundation**
+Status: **PASSED - LIVE EXISTING BUILDER TRANSPORT (18-Aug-2026)**
 
 Architecture:
 - Proposal Builder remains frozen.
@@ -281,16 +281,21 @@ Build:
 - failure/retry/human-review state.
 
 Acceptance:
-- approved CP path completes through a fake documented Builder adapter without modifying Proposal Builder source,
+- approved CP and AMC paths complete through the frozen Builder's existing authenticated `/api/generate` endpoint,
+- TP completes through the existing `/api/generate-tp-vendor` endpoint with a SHA-256-verified source artifact from a controlled local root,
 - frozen commercial payload numbers are handed to Builder unchanged,
 - artifact and audit linkage are complete,
-- live CP completion remains blocked until the external frozen Proposal Builder exposes `/api/v1/builds`.
+- returned DOCX artifacts are content-addressed and archived with validation metadata,
+- no Proposal Builder source or runtime configuration is modified.
 
 ---
 
 ## P1-20 — TP golden-fidelity gate
 
 Status: **PENDING**
+
+Live TP output is now available through P1-19 and this is the next actionable
+engineering item.
 
 Use frozen Proposal Builder output.
 

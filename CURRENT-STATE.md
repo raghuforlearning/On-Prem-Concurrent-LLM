@@ -24,7 +24,7 @@ Validated implementation branch:
 
 The exact task commit SHA is reported in the completion handoff after commit creation.
 
-Date of this validated baseline: 12-Aug-2026.
+Date of this validated baseline: 18-Aug-2026.
 
 ## Product boundary
 
@@ -127,6 +127,19 @@ The Orchestrator is the only coordinator between the Local LLM and Proposal Buil
 - per-vendor Deal Registration visibility; comparison may proceed while pending,
   while proposal eligibility remains fail-closed
 
+### Proposal Builder handoff and live document generation
+- frozen commercial payload, precondition gates and Builder job/audit tracking
+- configurable `v1_async` or existing synchronous Builder transport
+- live authenticated CP and AMC generation through the frozen Builder's existing
+  `/api/generate` endpoint
+- live TP generation through the frozen Builder's existing
+  `/api/generate-tp-vendor` upload endpoint
+- TP source files restricted to controlled local artifact roots and verified by
+  SHA-256 before upload
+- returned DOCX artifacts archived in an Orchestrator-owned Docker volume with
+  SHA-256, payload and validation provenance
+- live CP, TP and AMC synthetic UAT acceptance passed on 18-Aug-2026
+
 ## Important current decisions
 
 ### Proposal Builder
@@ -210,9 +223,13 @@ screening/quarantine events, prompt-injection regression checks, RBAC policy
 verification helpers, restore-verification evidence, security event persistence,
 audit linkage and secrets-hygiene regression checks without cloud/SaaS scanners.
 
-All currently actionable Orchestrator P1 items are complete through P1-25.
-Remaining blocked/deferred items:
-- P1-20/P1-21 require frozen Proposal Builder build output.
+All Orchestrator P1 foundation items are complete through P1-25. The former
+live Proposal Builder endpoint blocker is resolved through the frozen Builder's
+existing synchronous contracts. Remaining work:
+- P1-20 is now actionable using the live TP output and remains the exact next
+  engineering item.
+- P1-21 remains deferred until P1-20 determines whether a separate rendering
+  worker is genuinely required.
 - P1-24 requires the real P1-14 labelled historical dataset benchmark run.
 - Production ops controls such as ClamAV/Wazuh/full isolated restore drills
   remain deployment/operations activities.
