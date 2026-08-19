@@ -333,7 +333,7 @@ synthetic transport test.
 
 ## P1-21 — Document rendering worker feasibility / implementation
 
-Status: **REQUIRED FOR PRODUCTION / NOT STARTED**
+Status: **IN PROGRESS - FOUNDATION IMPLEMENTED / CANDIDATE-VM ACCEPTANCE PENDING**
 
 Do not automatically build the Windows/Office worker simply because Architecture v2.0 described it.
 
@@ -349,6 +349,24 @@ If still required:
 - serialized jobs,
 - quarantine/recovery,
 - reboot survival.
+
+19-Aug implementation evidence:
+- immutable hash/security-cleared render-job contract implemented;
+- worker accepts only controlled local Builder-produced DOCX inputs and rejects
+  path escapes, hash mismatches, uncleared inputs and macro-bearing packages;
+- Word COM is launched in an isolated hidden process, jobs are serialized,
+  outputs are hash-verified, and failures retry once then quarantine;
+- focused worker plus proposal regressions: 27 passed;
+- a real quarantined Builder TP exceeded the 90-second Word deadline on both
+  attempts; exact PID cleanup succeeded and left no ghost `WINWORD.EXE`;
+- an isolated working-copy change allowed the real Builder CP to open, update
+  fields, repaginate and save, but Word PDF export still did not return within
+  180 seconds; the job was quarantined with no ghost Word process;
+- the local run is not candidate-VM acceptance and did not produce a passing
+  PDF. WT-1, WT-2, WT-4 (<=60 seconds) and WT-7 still require the approved
+  Windows/Office candidate VM and service account.
+
+Do not mark P1-21 passed until the candidate-VM gates and P1-20 TP gate pass.
 
 ---
 

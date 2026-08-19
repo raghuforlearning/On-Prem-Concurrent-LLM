@@ -14,6 +14,10 @@ TP production-fidelity status:
 
 **P1-20 AUTOMATED GATE IMPLEMENTED; LIVE TP QUARANTINED (19-Aug-2026)**
 
+Document-worker status:
+
+**P1-21 FOUNDATION IMPLEMENTED; CANDIDATE-VM ACCEPTANCE PENDING (19-Aug-2026)**
+
 Production-server UAT preparation:
 
 **P1-OPS-UAT-PREP DONE (14-Aug-2026)**
@@ -254,6 +258,14 @@ synchronous contracts, but production exit gates remain:
   acceptance failed and correctly quarantined the TP.
 - P1-21 is now required for production to resolve Word/PDF rendering and visual
   fidelity without modifying the frozen Proposal Builder.
+- P1-21 now has an Orchestrator-owned immutable render contract, serialized
+  Word runner, exact-PID watchdog cleanup and quarantine evidence. A live local
+  run of the real quarantined Builder TP timed out twice at 90 seconds and was
+  cleanly quarantined with no ghost Word process. A Builder CP working copy
+  opened, updated, repaginated and saved, but Word PDF export did not return
+  within 180 seconds and was also cleanly quarantined. This is feasibility
+  evidence, not acceptance; WT-1, WT-2, WT-4 and WT-7 still require a dedicated
+  candidate Windows/Office VM and service account.
 - P1-24 requires the real P1-14 labelled historical dataset benchmark run.
 - Production ops controls such as ClamAV/Wazuh/full isolated restore drills
   remain deployment/operations activities.

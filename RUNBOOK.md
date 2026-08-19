@@ -349,6 +349,21 @@ The current UAT stays local in Docker. The 14-Aug-2026 Hyper-V assessment found
 Orchestrator VM. Do not place the Orchestrator inside the frozen AI Inference or
 Proposal Builder VMs. Reassess capacity when the system is production-ready.
 
+P1-21 worker operations:
+- the implementation and current WT matrix are in
+  `docs/P1-21-Windows-Document-Worker-Feasibility.md`;
+- never run the Office worker when an unmanaged `WINWORD.EXE` process already
+  exists; investigate and clear the orphan first;
+- accept only a Builder-produced DOCX whose SHA-256 matches an explicit
+  `CLEARED` security record and whose path is under an allow-listed artifact
+  root;
+- run one Office job at a time; retry once; quarantine any timeout, hash
+  mismatch, unexpected artifact or Office failure;
+- a quarantined job is not releasable and must not be manually relabelled
+  passed;
+- do not deploy the worker as a service or run reboot tests until IT approves
+  the candidate Windows VM, licensed Office and low-privilege service account.
+
 For the later dedicated-server deployment, use:
 
 ```text

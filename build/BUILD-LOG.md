@@ -5,6 +5,46 @@ Rules: one backlog item at a time · acceptance test must pass before next item 
 
 ---
 
+## P1-21 - Windows document-worker - FOUNDATION IMPLEMENTED / ACCEPTANCE PENDING (19-Aug-2026)
+
+### Built (`build/p1-25/app/`)
+
+- Added `document_worker.py`: immutable source/clearance hash contract,
+  allow-listed local roots, macro rejection, deterministic request identity,
+  serialized Office execution, timeout/retry, output hash checks and quarantine.
+- Added `windows-document-worker/Invoke-DocumentRender.ps1`: isolated hidden
+  Word COM execution, disabled macros/link updates, exact Word PID evidence,
+  milestone logs, immutable-source working copy, DOCX save, PDF export and COM
+  cleanup.
+- Added five focused tests covering contract/security failure, idempotency,
+  DOCX/PDF hash verification, two-job serialization and retry/quarantine.
+- No Proposal Builder or Local LLM source/runtime configuration was changed;
+  no proposal-template or business logic was copied into the worker.
+
+### Evidence
+
+| Check | Result |
+|---|---|
+| P1-21 + proposal regression suite | **27 passed** |
+| Local Word COM | **16.0, invisible launch confirmed** |
+| Real frozen Builder TP | **Timed out twice at 90 s; quarantined** |
+| Real frozen Builder CP | **DOCX saved; Word PDF export timed out at 180 s; quarantined** |
+| Exact PID cleanup | **Passed; no ghost `WINWORD.EXE`** |
+| WT-6 serialization | **Unit passed; maximum Office concurrency 1** |
+| WT-8 boundary | **Contract passed** |
+| WT-1 / WT-2 / WT-7 | **Not run; candidate VM/service account required** |
+| WT-4 candidate threshold | **Not accepted; local deadline was 90 s, required <=60 s** |
+
+### Decision / next gate
+
+P1-21 is not passed. The local real-document hang is a genuine implementation
+and environment blocker, not a reason to modify the frozen Builder or weaken
+P1-20. IT must approve a dedicated Windows/Office candidate VM and service
+account, then execute WT-1 through WT-8. The resulting TP must still pass P1-20.
+See `docs/P1-21-Windows-Document-Worker-Feasibility.md`.
+
+---
+
 ## P1-20 - TP golden-fidelity gate - GATE IMPLEMENTED / LIVE ACCEPTANCE FAILED (19-Aug-2026)
 
 ### Built (`build/p1-25/app/`)
