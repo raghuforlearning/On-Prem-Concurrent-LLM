@@ -18,6 +18,14 @@ Rules: one backlog item at a time · acceptance test must pass before next item 
   cleanup.
 - Added five focused tests covering contract/security failure, idempotency,
   DOCX/PDF hash verification, two-job serialization and retry/quarantine.
+- Added `document_render_queue.py`: durable PostgreSQL queue with idempotent
+  enqueue, one active Office lease, heartbeat, recovery and audited quarantine.
+- Added a distinct-token internal worker API for controlled Builder-DOCX
+  download and rendered DOCX/PDF return. Returned files are size/hash verified,
+  stored in a separate Orchestrator volume and registered before completion.
+- Added `windows-document-worker/worker_service.py`: polling, source hash
+  re-verification, heartbeat during Word execution and verified artifact upload.
+- Added queue/API/service tests and a minimal pinned Windows dependency file.
 - No Proposal Builder or Local LLM source/runtime configuration was changed;
   no proposal-template or business logic was copied into the worker.
 
@@ -25,7 +33,9 @@ Rules: one backlog item at a time · acceptance test must pass before next item 
 
 | Check | Result |
 |---|---|
-| P1-21 + proposal regression suite | **27 passed** |
+| Focused P1-19 through P1-22 regression suite | **34 passed** |
+| P1-21 disposable-PostgreSQL queue integration | **2 passed** |
+| Full active Orchestrator suite | **83 passed, 19 expected opt-in/live skips** |
 | Local Word COM | **16.0, invisible launch confirmed** |
 | Real frozen Builder TP | **Timed out twice at 90 s; quarantined** |
 | Real frozen Builder CP | **DOCX saved; Word PDF export timed out at 180 s; quarantined** |
@@ -37,10 +47,12 @@ Rules: one backlog item at a time · acceptance test must pass before next item 
 
 ### Decision / next gate
 
-P1-21 is not passed. The local real-document hang is a genuine implementation
-and environment blocker, not a reason to modify the frozen Builder or weaken
-P1-20. IT must approve a dedicated Windows/Office candidate VM and service
-account, then execute WT-1 through WT-8. The resulting TP must still pass P1-20.
+P1-21 is not passed. The durable queue and worker loop remove the remaining
+code-side transport/resume gap, but the local real-document hang remains a
+genuine environment/Office blocker, not a reason to modify the frozen Builder
+or weaken P1-20. IT must approve a dedicated Windows/Office candidate VM and
+service account, then execute WT-1 through WT-8. The resulting TP must still
+pass P1-20.
 See `docs/P1-21-Windows-Document-Worker-Feasibility.md`.
 
 ---

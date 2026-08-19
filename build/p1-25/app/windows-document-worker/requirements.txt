@@ -1,0 +1,2 @@
+# P1-21 minimal Windows worker dependency; mirror this wheel into the air-gap.
+httpx==0.28.1

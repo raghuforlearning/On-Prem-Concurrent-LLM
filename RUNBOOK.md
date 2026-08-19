@@ -364,6 +364,23 @@ P1-21 worker operations:
 - do not deploy the worker as a service or run reboot tests until IT approves
   the candidate Windows VM, licensed Office and low-privilege service account.
 
+P1-21 code-side worker configuration (candidate VM only after approval):
+- set `DOCUMENT_WORKER_TOKEN` to the same dedicated random value in the ignored
+  Orchestrator `.env` and in the Windows service account environment; never use
+  the Proposal Builder credential;
+- set `DOCUMENT_RENDER_ARTIFACT_ROOT` only on the Orchestrator API host; the
+  Compose default is `/srv/data/document_render_artifacts` in its own volume;
+- set Windows `ORCHESTRATOR_URL`, `DOCUMENT_WORKER_INBOX_ROOT`,
+  `DOCUMENT_WORKER_OUTPUT_ROOT` and optionally `DOCUMENT_WORKER_CA_BUNDLE`;
+  all Windows filesystem paths must be absolute;
+- install only the offline-mirrored dependency in
+  `build/p1-25/app/windows-document-worker/requirements.txt`, then run
+  `python windows-document-worker/worker_service.py --once` for a controlled
+  smoke check before any service registration;
+- do not copy Proposal Builder source/templates to the worker. The worker pulls
+  only the hash-cleared Builder DOCX from the Orchestrator and returns rendered
+  DOCX/PDF to Orchestrator-controlled storage.
+
 For the later dedicated-server deployment, use:
 
 ```text

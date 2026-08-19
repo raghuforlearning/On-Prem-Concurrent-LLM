@@ -19,6 +19,7 @@ def pytest_sessionstart(session):
     import proposals
     import benchmarks
     import security
+    import document_render_queue
     import vendors
 
     init_schema()
@@ -31,3 +32,4 @@ def pytest_sessionstart(session):
     proposals.init_proposals(PG_DSN)
     benchmarks.init_benchmarks(PG_DSN)
     security.init_security(PG_DSN)
+    document_render_queue.init_document_render_queue(PG_DSN)

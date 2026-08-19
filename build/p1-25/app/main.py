@@ -4,11 +4,12 @@ Adds workflow endpoints on top of the P1-03 health/audit skeleton.
 import os
 import time
 import json
+from hashlib import sha256
 from decimal import Decimal
 from datetime import date
 import httpx
 import psycopg
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 from db import PG_DSN, init_schema
@@ -22,6 +23,7 @@ import quote_comparison as comparison_store
 import proposals as proposal_store
 import benchmarks as benchmark_store
 import security as security_store
+import document_render_queue as render_queue_store
 from vendors import init_vendors
 from integrations.proposal_builder import (
     BuilderError,
@@ -69,6 +71,7 @@ def startup():
     proposal_store.init_proposals(PG_DSN)
     benchmark_store.init_benchmarks(PG_DSN)
     security_store.init_security(PG_DSN)
+    render_queue_store.init_document_render_queue(PG_DSN)
 
 
 @app.get("/healthz")
@@ -130,6 +133,7 @@ from pathlib import Path
 ARCHIVE = Path("/srv/data/rfp_archive")
 QUOTE_ARCHIVE = Path("/srv/data/quote_archive")
 MAX_QUOTE_BYTES = 50 * 1024 * 1024
+MAX_RENDER_ARTIFACT_BYTES = 100 * 1024 * 1024
 
 
 @app.post("/opportunities/upload")
@@ -589,6 +593,199 @@ def refresh_proposal_build(build_job_id: int, body: ProposalBuildIn):
 @app.get("/proposals/{proposal_id}/artifacts")
 def proposal_artifacts(proposal_id: int):
     return proposal_store.ProposalRepository(PG_DSN).artifacts(proposal_id)
+
+
+# ---------- P1-21: durable isolated document-render queue ----------
+
+class DocumentRenderEnqueueIn(BaseModel):
+    security_clearance: dict
+    actor: str = "api.user"
+    renderer_profile: str = "word-com-v1"
+
+
+@app.post("/proposal-build-jobs/{build_job_id}/render")
+def enqueue_document_render(build_job_id: int, body: DocumentRenderEnqueueIn):
+    """Queue a hash-cleared Builder DOCX; does not alter proposal content."""
+    return render_queue_store.DocumentRenderQueue(PG_DSN).enqueue(
+        build_job_id=build_job_id,
+        security_clearance=body.security_clearance,
+        actor=body.actor,
+        renderer_profile=body.renderer_profile,
+    )
+
+
+def _require_document_worker_token(supplied: str | None) -> None:
+    import hmac
+
+    configured = os.environ.get("DOCUMENT_WORKER_TOKEN", "")
+    if not configured:
+        raise HTTPException(503, "document worker token is not configured")
+    if not supplied or not hmac.compare_digest(supplied, configured):
+        raise HTTPException(401, "invalid document worker token")
+
+
+class DocumentWorkerClaimIn(BaseModel):
+    worker_id: str
+    lease_seconds: int = 120
+    max_claims: int = 3
+
+
+class DocumentWorkerLeaseIn(BaseModel):
+    worker_id: str
+    lease_seconds: int = 120
+
+
+class DocumentWorkerCompleteIn(BaseModel):
+    worker_id: str
+    result: dict
+
+
+@app.post("/internal/document-worker/jobs/claim")
+def claim_document_render(
+    body: DocumentWorkerClaimIn,
+    x_document_worker_token: str | None = Header(default=None),
+):
+    _require_document_worker_token(x_document_worker_token)
+    return render_queue_store.DocumentRenderQueue(PG_DSN).claim(
+        worker_id=body.worker_id,
+        lease_seconds=body.lease_seconds,
+        max_claims=body.max_claims,
+    )
+
+
+@app.post("/internal/document-worker/jobs/{render_job_id}/start")
+def start_document_render(
+    render_job_id: int,
+    body: DocumentWorkerLeaseIn,
+    x_document_worker_token: str | None = Header(default=None),
+):
+    _require_document_worker_token(x_document_worker_token)
+    return render_queue_store.DocumentRenderQueue(PG_DSN).start(
+        render_job_id=render_job_id,
+        worker_id=body.worker_id,
+        lease_seconds=body.lease_seconds,
+    )
+
+
+@app.post("/internal/document-worker/jobs/{render_job_id}/heartbeat")
+def heartbeat_document_render(
+    render_job_id: int,
+    body: DocumentWorkerLeaseIn,
+    x_document_worker_token: str | None = Header(default=None),
+):
+    _require_document_worker_token(x_document_worker_token)
+    return render_queue_store.DocumentRenderQueue(PG_DSN).heartbeat(
+        render_job_id=render_job_id,
+        worker_id=body.worker_id,
+        lease_seconds=body.lease_seconds,
+    )
+
+
+@app.get("/internal/document-worker/jobs/{render_job_id}/source")
+def document_render_source(
+    render_job_id: int,
+    worker_id: str,
+    x_document_worker_token: str | None = Header(default=None),
+):
+    _require_document_worker_token(x_document_worker_token)
+    source = render_queue_store.DocumentRenderQueue(PG_DSN).source_file(
+        render_job_id=render_job_id,
+        worker_id=worker_id,
+        allowed_roots=[
+            os.environ.get("PROPOSAL_BUILDER_ARTIFACT_ROOT", "/srv/data/proposal_artifacts")
+        ],
+    )
+    from fastapi.responses import FileResponse
+
+    return FileResponse(
+        path=source["path"],
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename=f"p121-{render_job_id}-source.docx",
+        headers={
+            "X-Document-SHA256": source["source_sha256"],
+            "X-Document-Request-Hash": source["request_hash"],
+        },
+    )
+
+
+@app.get("/internal/document-worker/jobs/{render_job_id}/source-manifest")
+def document_render_source_manifest(
+    render_job_id: int,
+    worker_id: str,
+    x_document_worker_token: str | None = Header(default=None),
+):
+    _require_document_worker_token(x_document_worker_token)
+    return render_queue_store.DocumentRenderQueue(PG_DSN).source_manifest(
+        render_job_id=render_job_id,
+        worker_id=worker_id,
+    )
+
+
+@app.post("/internal/document-worker/jobs/{render_job_id}/artifacts")
+async def upload_document_render_artifact(
+    render_job_id: int,
+    worker_id: str = Form(...),
+    artifact_kind: str = Form(...),
+    artifact_sha256: str = Form(...),
+    file: UploadFile = File(...),
+    x_document_worker_token: str | None = Header(default=None),
+):
+    """Return a rendered artifact to controlled Orchestrator storage."""
+    _require_document_worker_token(x_document_worker_token)
+    kind = artifact_kind.strip().lower()
+    expected_hash = artifact_sha256.strip().lower()
+    if kind not in {"docx", "pdf"}:
+        raise HTTPException(400, "artifact_kind must be docx or pdf")
+    if len(expected_hash) != 64 or any(c not in "0123456789abcdef" for c in expected_hash):
+        raise HTTPException(400, "artifact_sha256 must be a lowercase SHA-256 digest")
+    root = Path(
+        os.environ.get("DOCUMENT_RENDER_ARTIFACT_ROOT", "/srv/data/document_render_artifacts")
+    ).resolve()
+    destination_dir = (root / str(render_job_id)).resolve()
+    if not (destination_dir == root or destination_dir.is_relative_to(root)):
+        raise HTTPException(400, "invalid render artifact destination")
+    destination_dir.mkdir(parents=True, exist_ok=True)
+    destination = destination_dir / f"rendered.{kind}"
+    temporary = destination_dir / f"rendered.{kind}.uploading"
+    digest = sha256()
+    size = 0
+    try:
+        with temporary.open("wb") as stream:
+            while chunk := await file.read(1024 * 1024):
+                size += len(chunk)
+                if size > MAX_RENDER_ARTIFACT_BYTES:
+                    raise HTTPException(413, "render artifact exceeds 100 MiB")
+                digest.update(chunk)
+                stream.write(chunk)
+        if size == 0 or digest.hexdigest() != expected_hash:
+            raise HTTPException(422, "render artifact size or SHA-256 verification failed")
+        temporary.replace(destination)
+        return render_queue_store.DocumentRenderQueue(PG_DSN).record_artifact(
+            render_job_id=render_job_id,
+            worker_id=worker_id,
+            artifact_kind=kind,
+            artifact_path=destination,
+            artifact_sha256=expected_hash,
+            size_bytes=size,
+            allowed_root=root,
+        )
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
+@app.post("/internal/document-worker/jobs/{render_job_id}/complete")
+def complete_document_render(
+    render_job_id: int,
+    body: DocumentWorkerCompleteIn,
+    x_document_worker_token: str | None = Header(default=None),
+):
+    _require_document_worker_token(x_document_worker_token)
+    return render_queue_store.DocumentRenderQueue(PG_DSN).complete(
+        render_job_id=render_job_id,
+        worker_id=body.worker_id,
+        result=body.result,
+    )
 
 
 # ---------- P1-22: proposal release flow ----------

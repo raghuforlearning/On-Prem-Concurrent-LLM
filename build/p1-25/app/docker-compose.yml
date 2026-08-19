@@ -15,6 +15,7 @@ services:
       - rfp-archive:/srv/data/rfp_archive   # originals preserved byte-for-byte
       - quote-archive:/srv/data/quote_archive # raw vendor quotes, content-addressed
       - proposal-artifacts:/srv/data/proposal_artifacts # frozen Builder outputs + hashes
+      - document-render-artifacts:/srv/data/document_render_artifacts # P1-21 Word outputs
     environment:
       PG_DSN: postgresql://orchestrator_app:${PG_APP_PASSWORD}@${PG_HOST:-host.docker.internal}:${PG_PORT:-5432}/${PG_DATABASE:-orchestrator}
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
@@ -30,6 +31,8 @@ services:
       PROPOSAL_BUILDER_USERNAME: ${PROPOSAL_BUILDER_USERNAME:-}
       PROPOSAL_BUILDER_PASSWORD: ${PROPOSAL_BUILDER_PASSWORD:-}
       PROPOSAL_BUILDER_TIMEOUT_S: ${PROPOSAL_BUILDER_TIMEOUT_S:-120}
+      DOCUMENT_WORKER_TOKEN: ${DOCUMENT_WORKER_TOKEN:-}
+      DOCUMENT_RENDER_ARTIFACT_ROOT: ${DOCUMENT_RENDER_ARTIFACT_ROOT:-/srv/data/document_render_artifacts}
       QUOTE_VALIDATION_MONEY_TOLERANCE: ${QUOTE_VALIDATION_MONEY_TOLERANCE:-0.01}
       QUOTE_VALIDATION_REQUIRE_CURRENCY_DETECTED: ${QUOTE_VALIDATION_REQUIRE_CURRENCY_DETECTED:-true}
       QUOTE_VALIDATION_REQUIRE_STATED_TOTALS: ${QUOTE_VALIDATION_REQUIRE_STATED_TOTALS:-false}
@@ -59,3 +62,4 @@ volumes:
   rfp-archive:
   quote-archive:
   proposal-artifacts:
+  document-render-artifacts:

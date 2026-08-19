@@ -31,6 +31,17 @@ P1-20 nine-page non-conforming TP into the 26-page golden TP by itself.
   Word PID evidence, DOCX save, PDF export and COM cleanup.
 - `build/p1-25/app/tests/test_p121_document_worker.py`: offline contract,
   idempotency, serialization, artifact verification and quarantine tests.
+- `build/p1-25/app/document_render_queue.py`: durable PostgreSQL render queue,
+  one-active-lease claiming, heartbeat, expired-lease recovery, audited
+  quarantine and verified artifact registry.
+- `build/p1-25/app/main.py`: distinct-token internal worker API for claim,
+  start, heartbeat, source retrieval, rendered-artifact return and completion.
+- `build/p1-25/app/windows-document-worker/worker_service.py`: polling Windows
+  client that maintains the lease while Word runs and returns DOCX/PDF to the
+  Orchestrator instead of leaving authoritative artifacts on the worker VM.
+- `build/p1-25/app/tests/test_p121_queue_postgres.py`,
+  `test_p121_worker_api.py` and `test_p121_worker_service.py`: queue recovery,
+  API boundary, download hash and artifact-return coverage.
 
 ## Local feasibility evidence
 
@@ -39,7 +50,9 @@ P1-20 nine-page non-conforming TP into the 26-page golden TP by itself.
   `01adc6e02ac93e93c45fd02ad94808142bd5cc7a67be4abf5ad05589ac5bbe0a`.
 - Frozen Builder TP input SHA-256:
   `13d4af9773b3277543f51b234d806d7b98ffd8f375916844a40d9019e706494c`.
-- Unit/regression suite: 27 passed.
+- Focused P1-19 through P1-22 regressions: 34 passed.
+- Disposable-PostgreSQL queue integration: 2 passed.
+- Full active Orchestrator suite: 83 passed, 19 opt-in/live tests skipped.
 - Real Builder TP job `p121-live-tp-isolated` did not complete Word rendering
   within 90 seconds on either attempt. The supervisor terminated the exact
   Word process, quarantined the job and left no `WINWORD.EXE` process.
@@ -64,7 +77,7 @@ P1-20 nine-page non-conforming TP into the 26-page golden TP by itself.
 | WT-4 | Partial | Exact PID termination, retry and quarantine work; candidate VM must detect a modal/hang in 60 seconds or less and recover cleanly |
 | WT-5 | Not run | LibreOffice-versus-Word render comparison with an agreed threshold |
 | WT-6 | Unit passed | Two concurrent jobs serialize to maximum Office concurrency one; repeat on candidate VM |
-| WT-7 | Not run | Windows service auto-start and PostgreSQL-backed queue resume after reboot with zero lost jobs |
+| WT-7 | Code-side queue/service loop implemented; not run | Install only on the approved candidate VM, then prove service auto-start and PostgreSQL-backed queue resume after reboot with zero lost jobs |
 | WT-8 | Contract passed | Worker refuses non-cleared, hash-mismatched, macro-bearing or out-of-root sources; repeat with production malware-clearance evidence |
 
 ## Candidate VM acceptance sequence

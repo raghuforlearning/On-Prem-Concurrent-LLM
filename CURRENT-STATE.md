@@ -168,6 +168,21 @@ The Orchestrator is the only coordinator between the Local LLM and Proposal Buil
   nested synthetic CP content in the test appendix, an incorrect/stale TOC
   page reference and visible layout drift; this output is not production-ready
 
+### Isolated Windows document-worker foundation
+- PostgreSQL-backed render jobs with idempotent request hashes, serialized
+  claiming, bounded leases, heartbeats, expired-lease recovery and terminal
+  quarantine
+- worker-only API protected by a distinct constant-time-compared internal token
+- source download requires an active lease and re-verifies the immutable Builder
+  DOCX against its recorded SHA-256 and controlled artifact root
+- Windows polling service downloads only the leased source, runs the isolated
+  Word supervisor and maintains its lease during rendering
+- rendered DOCX/PDF files return to a separate Orchestrator-controlled volume;
+  size and SHA-256 are verified before PostgreSQL registration and completion
+- latest active suite: 83 passed, 19 expected opt-in/live skips; dedicated
+  P1-21 PostgreSQL queue tests: 2 passed
+- no worker service has been installed and no candidate-VM WT gate is claimed
+
 ## Important current decisions
 
 ### Proposal Builder
@@ -258,8 +273,10 @@ synchronous contracts, but production exit gates remain:
   acceptance failed and correctly quarantined the TP.
 - P1-21 is now required for production to resolve Word/PDF rendering and visual
   fidelity without modifying the frozen Proposal Builder.
-- P1-21 now has an Orchestrator-owned immutable render contract, serialized
-  Word runner, exact-PID watchdog cleanup and quarantine evidence. A live local
+- P1-21 now has an Orchestrator-owned immutable render contract, durable
+  PostgreSQL queue, token-isolated worker API, lease/heartbeat/recovery,
+  hash-verified artifact return, serialized Word runner, exact-PID watchdog
+  cleanup and quarantine evidence. A live local
   run of the real quarantined Builder TP timed out twice at 90 seconds and was
   cleanly quarantined with no ghost Word process. A Builder CP working copy
   opened, updated, repaginated and saved, but Word PDF export did not return

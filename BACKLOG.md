@@ -352,11 +352,19 @@ If still required:
 
 19-Aug implementation evidence:
 - immutable hash/security-cleared render-job contract implemented;
+- durable PostgreSQL queue implemented with idempotent enqueue, a single active
+  Office lease, heartbeat, expired-lease reclaim and max-claim quarantine;
+- distinct token-protected worker endpoints now provide claim/start/heartbeat,
+  hash-verified source download, controlled DOCX/PDF return and completion;
+- Windows polling service implemented with source re-verification, live
+  heartbeat during Word execution and upload of verified results to a separate
+  Orchestrator artifact store;
 - worker accepts only controlled local Builder-produced DOCX inputs and rejects
   path escapes, hash mismatches, uncleared inputs and macro-bearing packages;
 - Word COM is launched in an isolated hidden process, jobs are serialized,
   outputs are hash-verified, and failures retry once then quarantine;
-- focused worker plus proposal regressions: 27 passed;
+- focused P1-19 through P1-22 regressions: 34 passed; dedicated queue integration
+  tests: 2 passed; full active suite: 83 passed and 19 opt-in/live skips;
 - a real quarantined Builder TP exceeded the 90-second Word deadline on both
   attempts; exact PID cleanup succeeded and left no ghost `WINWORD.EXE`;
 - an isolated working-copy change allowed the real Builder CP to open, update
