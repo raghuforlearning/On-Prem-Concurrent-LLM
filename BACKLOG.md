@@ -292,10 +292,10 @@ Acceptance:
 
 ## P1-20 — TP golden-fidelity gate
 
-Status: **PENDING**
+Status: **AUTOMATED GATE IMPLEMENTED / LIVE ACCEPTANCE FAILED (19-Aug-2026)**
 
-Live TP output is now available through P1-19 and this is the next actionable
-engineering item.
+The Orchestrator-side deterministic gate is implemented. It validates frozen
+Builder output and never edits the DOCX.
 
 Use frozen Proposal Builder output.
 
@@ -306,18 +306,41 @@ Validate:
 - approved RAG language only,
 - accepted quote facts only.
 
+Additional approved business rule:
+- `Commercials` must immediately follow `Proposed BOQ`,
+- TP customer prices must come from an approved costing-sheet snapshot,
+- internal vendor cost, margin, markup and buy-price fields must never appear
+  in the customer document.
+
+19-Aug live evidence:
+- DOCX integrity: pass,
+- `Proposed BOQ -> Commercials -> Acceptance`: pass,
+- BOQ/commercial tables and frozen selling facts: pass,
+- prohibited internal commercial labels: pass,
+- approved RAG provenance contract: pass,
+- golden embedded-object floor: **fail — 3 inline shapes vs 16 required**,
+- visual review: **fail — 9-page output vs 26-page golden, nested synthetic CP
+  content and TOC/layout drift**,
+- resulting state: `QUARANTINED`.
+
 Acceptance:
 - TP output passes the agreed golden-fidelity/visual regression threshold before TP is treated as production-ready.
+
+The acceptance condition is not met. Do not waive or mark P1-20 passed from the
+synthetic transport test.
 
 ---
 
 ## P1-21 — Document rendering worker feasibility / implementation
 
-Status: **DEFERRED UNTIL REQUIRED**
+Status: **REQUIRED FOR PRODUCTION / NOT STARTED**
 
 Do not automatically build the Windows/Office worker simply because Architecture v2.0 described it.
 
-First determine whether the frozen Proposal Builder output already satisfies Alpha requirements without this component.
+P1-20 determined that the frozen Proposal Builder output does not satisfy the
+golden TP requirement. Because the Builder is frozen, proceed with the approved
+isolated rendering-worker feasibility path; do not patch or copy Builder logic
+into the Orchestrator.
 
 If still required:
 - use the approved Windows document-worker feasibility tests,
@@ -427,7 +450,8 @@ Until email integration exists:
 
 # Immediate next engineering task
 
-All currently actionable Orchestrator P1 items are complete through P1-25.
+Core Orchestrator implementation exists through P1-25; P1-21 is now the open
+production engineering item after the P1-20 live fidelity failure.
 
 Production UAT preparation is now documented/configurable:
 - compose endpoint overrides for production `.env` values,
@@ -438,10 +462,10 @@ The Orchestrator remains in local Docker UAT while the Hyper-V host has only
 4.1 GB available RAM. Production-server deployment is deferred until the
 application is production-ready and dedicated VM capacity is approved.
 
-Immediate next action is owner collection/review of the real P1-14 dataset,
-using the committed pack. Business-live remains blocked until:
-- P1-20/P1-21 receive frozen Proposal Builder build output or are explicitly
-  waived/deferred by the business,
+Immediate engineering action is P1-21 rendering-worker feasibility because the
+live frozen Builder TP failed P1-20 and was quarantined. P1-14 owner
+collection/review continues in parallel. Business-live remains blocked until:
+- P1-21 produces a TP that passes the P1-20 structural and visual gate,
 - P1-24 is run against the real P1-14 labelled historical dataset,
 - production backup/restore and security operations are validated on the target
   servers.

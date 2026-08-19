@@ -10,6 +10,10 @@ Current validated milestone:
 
 **P1-25 PASSED**
 
+TP production-fidelity status:
+
+**P1-20 AUTOMATED GATE IMPLEMENTED; LIVE TP QUARANTINED (19-Aug-2026)**
+
 Production-server UAT preparation:
 
 **P1-OPS-UAT-PREP DONE (14-Aug-2026)**
@@ -24,7 +28,7 @@ Validated implementation branch:
 
 The exact task commit SHA is reported in the completion handoff after commit creation.
 
-Date of this validated baseline: 18-Aug-2026.
+Date of this validated baseline: 19-Aug-2026.
 
 ## Product boundary
 
@@ -138,7 +142,27 @@ The Orchestrator is the only coordinator between the Local LLM and Proposal Buil
   SHA-256 before upload
 - returned DOCX artifacts archived in an Orchestrator-owned Docker volume with
   SHA-256, payload and validation provenance
-- live CP, TP and AMC synthetic UAT acceptance passed on 18-Aug-2026
+- live CP and AMC synthetic transport acceptance passed on 18-Aug-2026
+
+### TP golden-fidelity and customer-commercial safety
+- TP requires a distinct approved customer-facing costing snapshot; the
+  accepted vendor quote is not used as customer selling price
+- deterministic quantity x unit price, subtotal, VAT and grand-total checks
+  run before the frozen Builder is called
+- internal cost, buy-price, margin and markup fields are rejected from the
+  customer-commercial contract
+- generated TP validation checks DOCX integrity, exact
+  `Proposed BOQ -> Commercials -> Acceptance` order, required tables, frozen
+  selling facts, prohibited internal labels, approved RAG provenance and the
+  golden 16-inline-shape floor
+- failed document validation is persisted and moves the build and proposal to
+  `QUARANTINED`; release remains blocked
+- the 19-Aug live TP passed section/table/commercial/provenance checks but had
+  only 3 inline shapes versus the golden requirement of 16 and therefore was
+  correctly quarantined
+- Word-rendered inspection found 9 output pages versus the 26-page golden,
+  nested synthetic CP content in the test appendix, an incorrect/stale TOC
+  page reference and visible layout drift; this output is not production-ready
 
 ## Important current decisions
 
@@ -223,13 +247,13 @@ screening/quarantine events, prompt-injection regression checks, RBAC policy
 verification helpers, restore-verification evidence, security event persistence,
 audit linkage and secrets-hygiene regression checks without cloud/SaaS scanners.
 
-All Orchestrator P1 foundation items are complete through P1-25. The former
-live Proposal Builder endpoint blocker is resolved through the frozen Builder's
-existing synchronous contracts. Remaining work:
-- P1-20 is now actionable using the live TP output and remains the exact next
-  engineering item.
-- P1-21 remains deferred until P1-20 determines whether a separate rendering
-  worker is genuinely required.
+Core Orchestrator implementation exists through P1-25. The former live Proposal
+Builder endpoint blocker is resolved through the frozen Builder's existing
+synchronous contracts, but production exit gates remain:
+- the P1-20 automatic gate is implemented, but its live golden-fidelity
+  acceptance failed and correctly quarantined the TP.
+- P1-21 is now required for production to resolve Word/PDF rendering and visual
+  fidelity without modifying the frozen Proposal Builder.
 - P1-24 requires the real P1-14 labelled historical dataset benchmark run.
 - Production ops controls such as ClamAV/Wazuh/full isolated restore drills
   remain deployment/operations activities.
@@ -263,6 +287,6 @@ From Phase 0:
 - signed approval worksheet AM-1
 - 30–50 historical evaluation deals
 - final golden AMC confirmation
-- Windows/Office decision only if later document-rendering work still requires it
+- Windows/Office document-worker decision and candidate VM for P1-21
 
 These do not block all coding, but dependent acceptance tests cannot be signed off without them.

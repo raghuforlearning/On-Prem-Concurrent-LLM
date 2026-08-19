@@ -41,6 +41,46 @@ def _live_payload(proposal_type):
         "include_scope_of_work": False,
         "additional_notes": "Not for customer release.",
     }
+    if proposal_type == "TP":
+        builder_context.update(
+            {
+                "customer_commercials": {
+                    "currency": "AED",
+                    "subtotal": "100.00",
+                    "vat_rate": "5.00",
+                    "vat_amount": "5.00",
+                    "grand_total": "105.00",
+                    "terms": {
+                        "payment": "100% advance",
+                        "validity": "30 days",
+                        "delivery": "2 weeks",
+                    },
+                    "line_items": [
+                        {
+                            "line_no": 1,
+                            "part_number": "UAT-ONLY",
+                            "description": "Synthetic Orchestrator adapter acceptance item",
+                            "quantity": "1",
+                            "unit_price": "100.00",
+                            "line_total": "100.00",
+                        }
+                    ],
+                    "authority": {
+                        "kind": "APPROVED_COSTING_SHEET",
+                        "source_sha256": "c" * 64,
+                        "approved_by": "finance.uat",
+                        "approved_at": "2026-08-18T10:00:00+04:00",
+                    },
+                },
+                "rag_provenance": {
+                    "status": "APPROVED",
+                    "draft_id": 1,
+                    "retrieval_id": 1,
+                    "reviewed_by": "technical.uat",
+                    "reviewed_at": "2026-08-18T10:00:00+04:00",
+                },
+            }
+        )
     if proposal_type == "AMC":
         builder_context["amc"] = {
             "total_users": "25",
@@ -124,15 +164,25 @@ class ExistingProposalBuilderLiveTests(unittest.TestCase):
                         payload=payload,
                         payload_hash=payload_hash,
                     )
-                    self.assertEqual(created["state"], "done")
-                    self.assertEqual(client.get_build(created["job_id"])["state"], "done")
+                    expected_state = "quarantined" if proposal_type == "TP" else "done"
+                    self.assertEqual(created["state"], expected_state)
+                    self.assertEqual(client.get_build(created["job_id"])["state"], expected_state)
 
                     artifacts = client.get_artifacts(created["job_id"])
                     docx_path = Path(unquote(urlparse(artifacts["docx_ref"]).path))
                     content = docx_path.read_bytes()
                     self.assertTrue(content.startswith(b"PK\x03\x04"))
                     self.assertEqual(hashlib.sha256(content).hexdigest(), artifacts["docx_sha256"])
-                    self.assertTrue(artifacts["validation"]["passed"])
+                    if proposal_type == "TP":
+                        self.assertFalse(artifacts["validation"]["passed"])
+                        failed = {
+                            item["name"]
+                            for item in artifacts["validation"]["checks"]
+                            if not item["passed"]
+                        }
+                        self.assertIn("golden_inline_shape_floor", failed)
+                    else:
+                        self.assertTrue(artifacts["validation"]["passed"])
                     self.assertGreater(len(content), 100_000)
                     if proposal_type == "CP":
                         generated_cp = artifacts

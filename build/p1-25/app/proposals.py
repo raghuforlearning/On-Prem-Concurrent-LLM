@@ -689,9 +689,19 @@ class ProposalRepository:
         artifacts_saved = 0
         validation_saved = False
         try:
-            artifact_payload = adapter.get_artifacts(str(row[1])) if mapped_state == "DONE" else {}
+            artifact_payload = (
+                adapter.get_artifacts(str(row[1]))
+                if mapped_state in {"DONE", "QUARANTINED"}
+                else {}
+            )
             artifacts = _artifact_rows(artifact_payload)
             validation = artifact_payload.get("validation") if isinstance(artifact_payload, dict) else None
+            if isinstance(validation, dict):
+                validation_passed = bool(
+                    validation.get("passed") is True or validation.get("valid") is True
+                )
+                if not validation_passed:
+                    mapped_state = "QUARANTINED"
             with psycopg.connect(self.dsn) as conn:
                 for item in artifacts:
                     conn.execute(

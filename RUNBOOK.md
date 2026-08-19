@@ -244,6 +244,31 @@ P1-19 operations:
 - the existing synchronous transport returns DOCX only. P1-22 release remains
   fail-closed until a final SHA-256-tracked PDF also exists.
 
+P1-20 operations:
+- TP requires `context.proposal_builder.customer_commercials`. This is a
+  customer-facing selling-price snapshot, separate from the selected vendor
+  quote. It must contain currency, line items, subtotal, VAT rate, VAT amount,
+  grand total, payment/validity/delivery terms and an `authority` object.
+- `authority.kind` must be `APPROVED_COSTING_SHEET`; source SHA-256,
+  `approved_by` and `approved_at` are mandatory. Never place passwords or the
+  costing workbook itself in the frozen JSON payload.
+- only part number, description, quantity, unit price and line total are sent
+  to the Builder. Internal cost, buy price, vendor cost, margin and markup
+  fields are rejected.
+- the adapter independently checks line arithmetic, subtotal, VAT and grand
+  total with `Decimal`; no LLM participates in commercial arithmetic.
+- TP also requires approved `rag_provenance` with draft/retrieval IDs,
+  reviewer and review timestamp.
+- generated TP output must pass `p1-20.tp-golden.v1`: valid DOCX, immediate
+  `Proposed BOQ -> Commercials -> Acceptance` order, required BOQ/commercial
+  tables, exact frozen selling facts, no internal commercial labels, approved
+  RAG provenance and at least 16 inline shapes.
+- any failed validation is persisted and changes the build/proposal state to
+  `QUARANTINED`. Do not manually promote it or prepare a release package.
+- structural success does not replace visual review. The 19-Aug synthetic live
+  output is known to fail the golden gate (3/16 inline shapes) and must not be
+  used as a customer document.
+
 P1-22 operations:
 - proposal release is human-controlled. The Orchestrator records release
   package readiness and submission evidence; it does not send email or submit
@@ -310,13 +335,13 @@ Only after review should Codex begin P1-C implementation.
 
 ## 13. Current next engineering priority
 
-**External-input gated**
+**P1-21 rendering-worker feasibility**
 
 The Orchestrator P1 foundation is complete through P1-25. Remaining work is:
-P1-20 can now use live frozen Proposal Builder TP output. P1-21 remains deferred
-until that fidelity assessment proves it is required, and P1-24 needs the real
-P1-14 labelled historical dataset benchmark run. Production security operations
-such as ClamAV/Wazuh/full isolated restore drills must be validated on the target
+the P1-20 gate is implemented and its live TP failed golden fidelity, so P1-21
+is required for production. P1-24 still needs the real P1-14 labelled
+historical dataset benchmark run. Production security operations such as
+ClamAV/Wazuh/full isolated restore drills must be validated on the target
 servers before production sign-off.
 
 The current UAT stays local in Docker. The 14-Aug-2026 Hyper-V assessment found

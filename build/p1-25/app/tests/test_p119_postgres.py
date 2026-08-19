@@ -4,8 +4,9 @@ import uuid
 
 
 class FakeBuilderAdapter:
-    def __init__(self, *, fail_first=False):
+    def __init__(self, *, fail_first=False, validation_passed=True):
         self.fail_first = fail_first
+        self.validation_passed = validation_passed
         self.calls = []
         self.created = 0
 
@@ -41,7 +42,15 @@ class FakeBuilderAdapter:
                     "metadata": {"payload_hash": "recorded-by-builder"},
                 },
             ],
-            "validation": {"passed": True, "checks": [{"name": "numbers", "pass": True}]},
+            "validation": {
+                "passed": self.validation_passed,
+                "checks": [
+                    {
+                        "name": "golden_inline_shape_floor",
+                        "passed": self.validation_passed,
+                    }
+                ],
+            },
         }
 
 
@@ -319,6 +328,43 @@ class LivePostgresProposalHandoffTests(unittest.TestCase):
         self.assertEqual(retried["build_job_id"], failed["build_job_id"])
         self.assertEqual(retried["state"], "SUBMITTED")
         self.assertEqual(retried["attempts"], 2)
+
+    def test_failed_document_validation_is_persisted_and_quarantined(self):
+        self._seed_selection_and_approval()
+        repository = self.proposals.ProposalRepository(os.environ["P119_TEST_PG_DSN"])
+        assembled = repository.assemble(
+            opp_id=self.opp_id,
+            proposal_type="TP",
+            template_version="tp-test-v1",
+            actor="p120.presales",
+            context={"proposal_builder": {"synthetic": True}},
+        )
+        self.proposal_ids.append(assembled["proposal_id"])
+        self.version_ids.append(assembled["proposal_version_id"])
+        adapter = FakeBuilderAdapter(validation_passed=False)
+        submitted = repository.submit_build(
+            proposal_id=assembled["proposal_id"],
+            adapter=adapter,
+            actor="p120.presales",
+        )
+        self.job_ids.append(submitted["build_job_id"])
+        refreshed = repository.refresh_build(
+            build_job_id=submitted["build_job_id"],
+            adapter=adapter,
+            actor="p120.presales",
+        )
+        self.assertEqual(refreshed["state"], "QUARANTINED")
+        self.assertEqual(refreshed["artifacts_saved"], 2)
+        self.assertTrue(refreshed["validation_saved"])
+        artifacts = repository.artifacts(assembled["proposal_id"])
+        self.assertEqual(artifacts["status"], "QUARANTINED")
+        with self.psycopg.connect(os.environ["P119_TEST_PG_DSN"]) as conn:
+            passed = conn.execute(
+                "SELECT passed FROM document_validation_results "
+                "WHERE build_job_id=%s ORDER BY validation_result_id DESC LIMIT 1",
+                (submitted["build_job_id"],),
+            ).fetchone()[0]
+        self.assertFalse(passed)
 
 
 if __name__ == "__main__":

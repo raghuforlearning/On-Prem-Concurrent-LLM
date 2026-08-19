@@ -37,6 +37,16 @@ _SOURCE_CONTENT_TYPES = {
     ".pdf": "application/pdf",
 }
 _MAX_SOURCE_BYTES = 50 * 1024 * 1024
+_INTERNAL_COMMERCIAL_KEYS = {
+    "cost",
+    "cost_price",
+    "vendor_cost",
+    "buy_price",
+    "margin",
+    "margin_pct",
+    "markup",
+    "markup_pct",
+}
 
 
 def _canonical_json(payload: Any) -> str:
@@ -72,6 +82,119 @@ def _number(value: Any, field: str) -> float:
     if not number.is_finite() or number < 0:
         raise ValueError(f"{field} must be a non-negative finite number")
     return float(number)
+
+
+def _decimal(value: Any, field: str) -> Decimal:
+    try:
+        number = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise ValueError(f"{field} must be numeric") from exc
+    if not number.is_finite() or number < 0:
+        raise ValueError(f"{field} must be a non-negative finite number")
+    return number
+
+
+def _approved_tp_commercials(context: dict[str, Any]) -> dict[str, Any]:
+    """Validate the customer-facing snapshot supplied by the costing workflow."""
+    snapshot = context.get("customer_commercials")
+    if not isinstance(snapshot, dict):
+        raise ValueError(
+            "TP generation requires context.proposal_builder.customer_commercials "
+            "from an approved costing sheet"
+        )
+    forbidden = sorted(_INTERNAL_COMMERCIAL_KEYS.intersection(snapshot))
+    if forbidden:
+        raise ValueError(
+            "customer_commercials must not expose internal fields: " + ", ".join(forbidden)
+        )
+    authority = snapshot.get("authority")
+    if not isinstance(authority, dict):
+        raise ValueError("customer_commercials.authority is required")
+    if _text(authority.get("kind")).upper() != "APPROVED_COSTING_SHEET":
+        raise ValueError("customer_commercials authority must be APPROVED_COSTING_SHEET")
+    source_hash = _text(authority.get("source_sha256")).lower()
+    if not _SHA256_RE.fullmatch(source_hash):
+        raise ValueError("approved costing sheet source_sha256 is required")
+    for field in ("approved_by", "approved_at"):
+        if not _text(authority.get(field)):
+            raise ValueError(f"approved costing sheet {field} is required")
+
+    currency = _text(snapshot.get("currency")).upper()
+    if len(currency) != 3 or not currency.isalpha():
+        raise ValueError("customer_commercials.currency must be a three-letter code")
+    lines = snapshot.get("line_items")
+    if not isinstance(lines, list) or not lines:
+        raise ValueError("customer_commercials requires at least one selling-price line item")
+    normalized_lines: list[dict[str, Any]] = []
+    computed_subtotal = Decimal("0")
+    for index, line in enumerate(lines, 1):
+        if not isinstance(line, dict):
+            raise ValueError(f"customer commercial line item {index} must be an object")
+        forbidden_line = sorted(_INTERNAL_COMMERCIAL_KEYS.intersection(line))
+        if forbidden_line:
+            raise ValueError(
+                f"customer commercial line item {index} exposes internal fields: "
+                + ", ".join(forbidden_line)
+            )
+        description = _text(line.get("description"))
+        quantity = _decimal(line.get("quantity"), f"customer_commercials.line_items[{index}].quantity")
+        unit_price = _decimal(line.get("unit_price"), f"customer_commercials.line_items[{index}].unit_price")
+        line_total = _decimal(line.get("line_total"), f"customer_commercials.line_items[{index}].line_total")
+        if not description or quantity <= 0:
+            raise ValueError(f"customer commercial line item {index} requires description and quantity")
+        if (quantity * unit_price).quantize(Decimal("0.01")) != line_total.quantize(Decimal("0.01")):
+            raise ValueError(f"customer commercial line item {index} total does not equal quantity x unit price")
+        computed_subtotal += line_total
+        normalized_lines.append(
+            {
+                "line_no": int(line.get("line_no") or index),
+                "part_number": _text(line.get("part_number")),
+                "description": description,
+                "quantity": str(quantity),
+                "native_unit_price": format(unit_price, "f"),
+                "native_line_total": format(line_total, "f"),
+            }
+        )
+    subtotal = _decimal(snapshot.get("subtotal"), "customer_commercials.subtotal")
+    vat_rate = _decimal(snapshot.get("vat_rate"), "customer_commercials.vat_rate")
+    vat_amount = _decimal(snapshot.get("vat_amount"), "customer_commercials.vat_amount")
+    grand_total = _decimal(snapshot.get("grand_total"), "customer_commercials.grand_total")
+    if computed_subtotal.quantize(Decimal("0.01")) != subtotal.quantize(Decimal("0.01")):
+        raise ValueError("customer commercial subtotal does not equal the sum of line totals")
+    if (subtotal + vat_amount).quantize(Decimal("0.01")) != grand_total.quantize(Decimal("0.01")):
+        raise ValueError("customer commercial grand total does not equal subtotal plus VAT")
+    computed_vat = (subtotal * vat_rate / Decimal("100")).quantize(Decimal("0.01"))
+    if computed_vat != vat_amount.quantize(Decimal("0.01")):
+        raise ValueError("customer commercial VAT amount does not match subtotal x VAT rate")
+    terms = snapshot.get("terms") if isinstance(snapshot.get("terms"), dict) else {}
+    missing_terms = [
+        field for field in ("payment", "validity", "delivery") if not _text(terms.get(field))
+    ]
+    if missing_terms:
+        raise ValueError(
+            "approved customer commercial terms missing: " + ", ".join(missing_terms)
+        )
+    return {
+        "native_currency": currency,
+        "aed_total": format(grand_total, "f"),
+        "terms": terms,
+        "line_items": normalized_lines,
+        "authority": authority,
+    }
+
+
+def _require_approved_rag_provenance(context: dict[str, Any]) -> None:
+    provenance = context.get("rag_provenance")
+    if not isinstance(provenance, dict):
+        raise ValueError("TP generation requires approved RAG provenance")
+    missing = [
+        field
+        for field in ("draft_id", "retrieval_id", "reviewed_by", "reviewed_at")
+        if not provenance.get(field)
+    ]
+    if _text(provenance.get("status")).upper() != "APPROVED" or missing:
+        detail = ", ".join(missing) if missing else "status"
+        raise ValueError(f"TP generation requires approved RAG provenance: {detail}")
 
 
 def _safe_filename(content_disposition: str, fallback: str) -> str:
@@ -160,6 +283,9 @@ class ExistingProposalBuilderClient(ProposalBuilderClient):
         commercial = payload.get("commercial")
         if not isinstance(commercial, dict):
             raise ValueError("frozen payload has no commercial snapshot")
+        if normalized_type == "TP":
+            commercial = _approved_tp_commercials(context)
+            _require_approved_rag_provenance(context)
 
         proposal_number = _text(
             context.get("proposal_number") or context.get("prop_num") or context.get("propNum")
@@ -309,7 +435,10 @@ class ExistingProposalBuilderClient(ProposalBuilderClient):
         parsed = urlparse(artifact_ref)
         if parsed.scheme not in {"", "file"} or parsed.netloc not in {"", "localhost"}:
             raise ValueError("vendor TP artifact_ref must be a local file reference")
-        path = Path(unquote(parsed.path) if parsed.scheme == "file" else artifact_ref).resolve()
+        raw_path = unquote(parsed.path) if parsed.scheme == "file" else artifact_ref
+        if os.name == "nt" and re.match(r"^/[A-Za-z]:/", raw_path):
+            raw_path = raw_path[1:]
+        path = Path(raw_path).resolve()
         if not any(path.is_relative_to(root) for root in self.source_artifact_roots):
             raise ValueError("vendor TP artifact is outside the controlled artifact roots")
         if not path.is_file():
@@ -437,7 +566,7 @@ class ExistingProposalBuilderClient(ProposalBuilderClient):
             if existing:
                 if existing.get("payload_sha256") != payload_hash.lower():
                     raise BuilderUnavailableError("stored Builder job payload hash does not match")
-                return {"job_id": job_id, "state": "done", "existing": True}
+                return {"job_id": job_id, "state": existing["state"], "existing": True}
 
             if not self._authenticated:
                 self._login()
@@ -497,13 +626,30 @@ class ExistingProposalBuilderClient(ProposalBuilderClient):
                 f"{request_payload['propNum']}_{request_payload['version']}_{proposal_type}.docx",
             )
             docx_hash = hashlib.sha256(content).hexdigest()
+            if _text(proposal_type).upper() == "TP":
+                from tp_fidelity import validate_tp_fidelity
+
+                fidelity_validation = validate_tp_fidelity(
+                    content,
+                    request_payload=request_payload,
+                    frozen_payload=payload,
+                )
+            else:
+                fidelity_validation = {
+                    "passed": True,
+                    "checks": [
+                        {"name": "frozen_builder_generation", "passed": True},
+                        {"name": "docx_package_signature", "passed": True},
+                        {"name": "frozen_payload_hash", "passed": True},
+                    ],
+                }
             directory, docx_path, metadata_path = self._job_paths(job_id)
             directory.mkdir(parents=True, exist_ok=True)
             temp_docx = directory / f"proposal.{os.getpid()}.tmp"
             temp_metadata = directory / f"metadata.{os.getpid()}.tmp"
             metadata = {
                 "job_id": job_id,
-                "state": "done",
+                "state": "done" if fidelity_validation["passed"] else "quarantined",
                 "transport": self.transport,
                 "proposal_type": _text(proposal_type).upper(),
                 "template_version": template_version,
@@ -521,14 +667,7 @@ class ExistingProposalBuilderClient(ProposalBuilderClient):
                     if source_artifact
                     else None
                 ),
-                "validation": {
-                    "passed": True,
-                    "checks": [
-                        {"name": "frozen_builder_generation", "passed": True},
-                        {"name": "docx_package_signature", "passed": True},
-                        {"name": "frozen_payload_hash", "passed": True},
-                    ],
-                },
+                "validation": fidelity_validation,
             }
             try:
                 temp_docx.write_bytes(content)
@@ -541,7 +680,7 @@ class ExistingProposalBuilderClient(ProposalBuilderClient):
             finally:
                 temp_docx.unlink(missing_ok=True)
                 temp_metadata.unlink(missing_ok=True)
-            return {"job_id": job_id, "state": "done", "existing": False}
+            return {"job_id": job_id, "state": metadata["state"], "existing": False}
 
     def get_build(self, builder_job_id: str) -> dict[str, Any]:
         metadata = self._load_metadata(builder_job_id)

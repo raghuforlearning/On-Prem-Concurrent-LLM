@@ -5,6 +5,48 @@ Rules: one backlog item at a time · acceptance test must pass before next item 
 
 ---
 
+## P1-20 - TP golden-fidelity gate - GATE IMPLEMENTED / LIVE ACCEPTANCE FAILED (19-Aug-2026)
+
+### Built (`build/p1-25/app/`)
+
+- Added `tp_fidelity.py`, a deterministic read-only DOCX validator. It does not
+  generate, rewrite or restyle Proposal Builder output.
+- Enforced `Proposed BOQ -> Commercials -> Acceptance`, required BOQ and
+  commercial tables, exact customer-selling facts, approved RAG provenance,
+  prohibited internal commercial labels and the golden 16-inline-shape floor.
+- Added an approved customer-commercial contract derived from a controlled
+  costing sheet. Customer TP generation now rejects raw/internal cost, buy
+  price, margin and markup fields and validates line, subtotal, VAT and total
+  arithmetic before calling Builder.
+- Failed Builder validation is persisted with the returned artifact and moves
+  the build/proposal to `QUARANTINED`; P1-22 release remains fail-closed.
+- No Proposal Builder or Local LLM source/runtime configuration was modified.
+
+### Acceptance evidence
+
+| Check | Result |
+|---|---|
+| Focused P1-19/P1-20 suite | **20 passed** |
+| PostgreSQL handoff/quarantine suite | **3 passed** |
+| Full PostgreSQL 16/pgvector suite | **85 run: 83 passed, 2 opt-in live tests skipped** |
+| Opt-in frozen Builder CP/TP/AMC transport test | **1 passed** |
+| Live TP DOCX | **1,533,210 bytes**, SHA-256 `13d4af9773b3277543f51b234d806d7b98ffd8f375916844a40d9019e706494c` |
+| Required section order | **Passed**; Commercials immediately follows Proposed BOQ |
+| Selling facts / internal-label leakage | **Passed** |
+| Golden inline-shape floor | **Failed: 3 actual / 16 required** |
+| Word render inspection | **Failed: 9 pages vs 26-page golden; nested synthetic CP, TOC and layout drift** |
+| Final build state | **QUARANTINED** |
+
+### Decision / next task
+
+P1-20 is not accepted for production. The gate is working and prevented a
+non-conforming TP from advancing. **P1-21 is now required for production**
+unless the frozen external Builder owner supplies output that independently
+passes the same gate. Implement the approved isolated Windows/Office rendering
+worker feasibility tests without modifying or copying Proposal Builder logic.
+
+---
+
 ## P1-19 - Live existing Proposal Builder transport - PASSED (18-Aug-2026)
 
 ### Built (`build/p1-25/app/`)
@@ -37,11 +79,11 @@ Rules: one backlog item at a time · acceptance test must pass before next item 
 
 ### Remaining gates
 
-- P1-20 TP golden-fidelity/visual regression is now the next actionable item.
+- Resolved by the 19-Aug P1-20 assessment above: the live TP fails golden
+  fidelity and is quarantined.
 - The synchronous Builder returns DOCX only. The P1-22 release package remains
   fail-closed until the required final PDF artifact is available and hashed.
-- P1-21 remains deferred until P1-20 determines whether a rendering worker is
-  required.
+- P1-21 is required for production.
 
 ---
 

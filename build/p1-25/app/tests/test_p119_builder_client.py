@@ -116,6 +116,46 @@ def _frozen_payload(proposal_type="CP"):
             "include_assumptions": False,
         }
     }
+    if proposal_type == "TP":
+        context["proposal_builder"].update(
+            {
+                "customer_commercials": {
+                    "currency": "AED",
+                    "subtotal": "150.00",
+                    "vat_rate": "5.00",
+                    "vat_amount": "7.50",
+                    "grand_total": "157.50",
+                    "terms": {
+                        "payment": "30 days",
+                        "validity": "30 days",
+                        "delivery": "2 weeks",
+                    },
+                    "line_items": [
+                        {
+                            "line_no": 1,
+                            "part_number": "TEST-1",
+                            "description": "Synthetic customer line",
+                            "quantity": "2",
+                            "unit_price": "75.00",
+                            "line_total": "150.00",
+                        }
+                    ],
+                    "authority": {
+                        "kind": "APPROVED_COSTING_SHEET",
+                        "source_sha256": "c" * 64,
+                        "approved_by": "finance.test",
+                        "approved_at": "2026-08-18T10:00:00+04:00",
+                    },
+                },
+                "rag_provenance": {
+                    "status": "APPROVED",
+                    "draft_id": 1,
+                    "retrieval_id": 1,
+                    "reviewed_by": "technical.test",
+                    "reviewed_at": "2026-08-18T10:00:00+04:00",
+                },
+            }
+        )
     if proposal_type == "AMC":
         context["proposal_builder"]["amc"] = {
             "total_users": "25",
@@ -178,10 +218,16 @@ class ExistingProposalBuilderContractTests(unittest.TestCase):
                     payload_hash=_hash(payload),
                 )
                 self.assertEqual(mapped["type"], proposal_type)
-                self.assertEqual(mapped["terms"]["currency"], "USD")
-                self.assertEqual(mapped["boq"][0]["up"], "50.00")
-                self.assertEqual(mapped["boq"][0]["total"], "100.00")
-                self.assertEqual(mapped["expectedValue"], 385.65)
+                if proposal_type == "TP":
+                    self.assertEqual(mapped["terms"]["currency"], "AED")
+                    self.assertEqual(mapped["boq"][0]["up"], "75.00")
+                    self.assertEqual(mapped["boq"][0]["total"], "150.00")
+                    self.assertEqual(mapped["expectedValue"], 157.5)
+                else:
+                    self.assertEqual(mapped["terms"]["currency"], "USD")
+                    self.assertEqual(mapped["boq"][0]["up"], "50.00")
+                    self.assertEqual(mapped["boq"][0]["total"], "100.00")
+                    self.assertEqual(mapped["expectedValue"], 385.65)
         self.assertEqual(mapped["amcTrack"], "nl-owned")
         self.assertEqual(mapped["commercials"][0]["amount"], 100.0)
 
@@ -295,13 +341,13 @@ class ExistingProposalBuilderContractTests(unittest.TestCase):
                 payload=payload,
                 payload_hash=payload_hash,
             )
-            self.assertEqual(created["state"], "done")
+            self.assertEqual(created["state"], "quarantined")
             method, url, kwargs = session.calls[1]
             self.assertEqual(method, "POST")
             self.assertTrue(url.endswith("/api/generate-tp-vendor"))
             self.assertEqual(kwargs["files"]["file"][0], source_path.name)
             self.assertEqual(kwargs["files"]["file"][1], source_content)
-            self.assertEqual(json.loads(kwargs["data"]["boq"])[0]["total"], "100.00")
+            self.assertEqual(json.loads(kwargs["data"]["boq"])[0]["total"], "150.00")
 
     def test_tp_source_artifact_must_be_inside_controlled_roots(self):
         with tempfile.TemporaryDirectory() as artifacts, tempfile.TemporaryDirectory() as outside:
