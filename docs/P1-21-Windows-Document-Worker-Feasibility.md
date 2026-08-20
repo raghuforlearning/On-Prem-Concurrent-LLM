@@ -1,8 +1,8 @@
 # P1-21 Windows Document Worker Feasibility
 
-Date: 19-Aug-2026
+Date: 20-Aug-2026
 
-Status: **FOUNDATION IMPLEMENTED / CANDIDATE-VM ACCEPTANCE NOT PASSED**
+Status: **FOUNDATION IMPLEMENTED / CANDIDATE-VM DEPLOYMENT DEFERRED AND CONDITIONAL**
 
 ## Boundary
 
@@ -17,8 +17,12 @@ The worker is downstream of the frozen NationLabs Proposal Builder. It may:
 
 It must not create proposal content, apply the golden template, place BOQ or
 commercial tables, calculate prices, or repair a Builder output. Those remain
-Proposal Builder responsibilities. A render worker therefore cannot make the
-P1-20 nine-page non-conforming TP into the 26-page golden TP by itself.
+Proposal Builder responsibilities. A render worker therefore cannot make a
+non-conforming TP golden-compliant by itself. The 19-Aug nine-page result used
+generated CP output as its TP source and is not valid vendor-TP fidelity
+evidence. The corrected 20-Aug run used a hash-pinned genuine vendor PDF and
+still produced only 12 drawings versus 23 in the golden template, so the
+content-fidelity blocker remains external to this worker.
 
 ## Implemented Orchestrator components
 
@@ -80,6 +84,18 @@ P1-20 nine-page non-conforming TP into the 26-page golden TP by itself.
 | WT-7 | Code-side queue/service loop implemented; not run | Install only on the approved candidate VM, then prove service auto-start and PostgreSQL-backed queue resume after reboot with zero lost jobs |
 | WT-8 | Contract passed | Worker refuses non-cleared, hash-mismatched, macro-bearing or out-of-root sources; repeat with production malware-clearance evidence |
 
+## Candidate VM entry gates
+
+Do not provision or deploy the candidate VM until both are true:
+
+1. the frozen Proposal Builder produces a genuine-vendor-input DOCX that passes
+   the P1-20 structural gate and human visual review;
+2. the business confirms automatic PDF delivery is mandatory and the frozen
+   Builder remains DOCX-only.
+
+The worker may then render the already compliant DOCX and export PDF. It must
+never be used to add missing content or embedded objects.
+
 ## Candidate VM acceptance sequence
 
 1. IT approves a dedicated Windows Server 2022 VM, 4 vCPU, 16 GB RAM, 250 GB
@@ -94,4 +110,4 @@ P1-20 nine-page non-conforming TP into the 26-page golden TP by itself.
 5. Execute WT-1 through WT-8 and retain JSON results, process evidence, rendered
    DOCX/PDF hashes and visual-diff images.
 6. P1-21 can be marked passed only when WT-1, WT-2, WT-4 and WT-7 pass on that
-   VM and the resulting TP independently passes the P1-20 gate.
+   VM and the input/output TP remains independently compliant with P1-20.

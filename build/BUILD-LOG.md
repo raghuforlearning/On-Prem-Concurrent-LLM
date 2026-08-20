@@ -5,6 +5,53 @@ Rules: one backlog item at a time · acceptance test must pass before next item 
 
 ---
 
+## P1-20 - Live fixture correction / genuine vendor-TP acceptance - BLOCKED EXTERNALLY (20-Aug-2026)
+
+### Corrected (`build/p1-25/app/`)
+
+- Removed the invalid live-test fallback that generated a CP and then supplied
+  that CP to `/api/generate-tp-vendor` as though it were a vendor TP.
+- The opt-in test now requires a pre-existing vendor PDF/DOCX from a controlled
+  input archive and an operator-pinned SHA-256.
+- The fixture rejects relative paths, out-of-root files, extension/magic
+  mismatches, hash mismatches and every file under the generated proposal
+  artifact root.
+- TP live acceptance now requires `DONE` with a passing P1-20 validation; an
+  expected quarantine is no longer counted as acceptance.
+- No Proposal Builder or Local LLM file or runtime configuration was changed.
+
+### Evidence
+
+| Check | Result |
+|---|---|
+| New live-fixture contract tests | **4 passed** |
+| Focused P1-19/P1-20 suite | **19 passed** |
+| Full active Orchestrator suite | **103 passed, 19 expected opt-in/live skips** |
+| Builder health from Orchestrator | **HTTP 200, environment `UAT`** |
+| Controlled vendor TP input | **1,407,625 bytes**, SHA-256 `ea9342af5effeba80991496e598e3dd79ea2c587ae2a2c73b9b3363fa10b8240` |
+| CP and AMC live subtests | **DONE** |
+| TP order/tables/selling facts/leakage/RAG checks | **Passed** |
+| TP output | **2,090,445 bytes**, SHA-256 `8f86e53e0680a0bece5d32dfbb36150614c8fbdc6b11ce8bc490f51317b05a91` |
+| Golden object floor | **Failed: 5/16 `python-docx` inline shapes** |
+| Direct OOXML object comparison | **12 generated drawings vs 23 golden drawings** |
+| Corrected live test | **Failed at TP as designed; state `QUARANTINED`** |
+| Raster review | **Not completed; LibreOffice is not installed on the UAT Windows host** |
+
+### Decision / next gate
+
+P1-20 remains not accepted. The corrected run proves the frozen Builder
+transport works with genuine vendor input, while the produced TP still omits
+golden embedded objects. A rendering worker cannot recreate missing proposal
+content, so P1-21 is not a content-fidelity remedy. Candidate-VM P1-21 work is
+deferred unless a compliant Builder DOCX first exists and automatic PDF output
+is confirmed mandatory. Under the frozen-system rule, the Orchestrator must
+stop here rather than modify or copy Proposal Builder implementation.
+
+The 19-Aug CP-as-TP run below is retained as historical fail-closed evidence but
+is superseded as TP fidelity evidence.
+
+---
+
 ## P1-21 - Windows document-worker - FOUNDATION IMPLEMENTED / ACCEPTANCE PENDING (19-Aug-2026)
 
 ### Built (`build/p1-25/app/`)
@@ -47,17 +94,17 @@ Rules: one backlog item at a time · acceptance test must pass before next item 
 
 ### Decision / next gate
 
-P1-21 is not passed. The durable queue and worker loop remove the remaining
-code-side transport/resume gap, but the local real-document hang remains a
-genuine environment/Office blocker, not a reason to modify the frozen Builder
-or weaken P1-20. IT must approve a dedicated Windows/Office candidate VM and
-service account, then execute WT-1 through WT-8. The resulting TP must still
-pass P1-20.
+P1-21 is not passed. The durable queue and worker loop remove the code-side
+transport/resume gap, but cannot repair missing TP content or embedded objects.
+After the corrected 20-Aug genuine-vendor-TP run, candidate-VM work is
+conditional: a compliant Builder DOCX must first pass P1-20 and the business
+must confirm automatic PDF output is mandatory. Only then should IT approve a
+dedicated Windows/Office candidate VM and execute WT-1 through WT-8.
 See `docs/P1-21-Windows-Document-Worker-Feasibility.md`.
 
 ---
 
-## P1-20 - TP golden-fidelity gate - GATE IMPLEMENTED / LIVE ACCEPTANCE FAILED (19-Aug-2026)
+## P1-20 - TP golden-fidelity gate - HISTORICAL CP-AS-TP RUN (19-Aug-2026)
 
 ### Built (`build/p1-25/app/`)
 
@@ -81,7 +128,7 @@ See `docs/P1-21-Windows-Document-Worker-Feasibility.md`.
 | Focused P1-19/P1-20 suite | **20 passed** |
 | PostgreSQL handoff/quarantine suite | **3 passed** |
 | Full PostgreSQL 16/pgvector suite | **85 run: 83 passed, 2 opt-in live tests skipped** |
-| Opt-in frozen Builder CP/TP/AMC transport test | **1 passed** |
+| Opt-in frozen Builder CP/TP/AMC transport test | **1 passed under the former expected-quarantine assertion** |
 | Live TP DOCX | **1,533,210 bytes**, SHA-256 `13d4af9773b3277543f51b234d806d7b98ffd8f375916844a40d9019e706494c` |
 | Required section order | **Passed**; Commercials immediately follows Proposed BOQ |
 | Selling facts / internal-label leakage | **Passed** |
@@ -91,11 +138,10 @@ See `docs/P1-21-Windows-Document-Worker-Feasibility.md`.
 
 ### Decision / next task
 
-P1-20 is not accepted for production. The gate is working and prevented a
-non-conforming TP from advancing. **P1-21 is now required for production**
-unless the frozen external Builder owner supplies output that independently
-passes the same gate. Implement the approved isolated Windows/Office rendering
-worker feasibility tests without modifying or copying Proposal Builder logic.
+P1-20 was not accepted for production. This run proved fail-closed quarantine,
+but its CP-as-TP input was not valid vendor-TP fidelity evidence. The corrected
+20-Aug run above supersedes its fidelity conclusion. P1-21 is not a remedy for
+missing Builder content and remains conditional.
 
 ---
 
@@ -131,11 +177,12 @@ worker feasibility tests without modifying or copying Proposal Builder logic.
 
 ### Remaining gates
 
-- Resolved by the 19-Aug P1-20 assessment above: the live TP fails golden
-  fidelity and is quarantined.
+- Corrected on 20-Aug: genuine vendor input reaches the TP endpoint and the
+  output is archived, but P1-20 still quarantines it for missing golden objects.
 - The synchronous Builder returns DOCX only. The P1-22 release package remains
   fail-closed until the required final PDF artifact is available and hashed.
-- P1-21 is required for production.
+- P1-21 is conditional on a compliant Builder DOCX plus a confirmed automatic
+  PDF requirement.
 
 ---
 

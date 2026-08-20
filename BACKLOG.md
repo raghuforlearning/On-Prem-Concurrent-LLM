@@ -292,7 +292,7 @@ Acceptance:
 
 ## P1-20 — TP golden-fidelity gate
 
-Status: **AUTOMATED GATE IMPLEMENTED / LIVE ACCEPTANCE FAILED (19-Aug-2026)**
+Status: **AUTOMATED GATE IMPLEMENTED / GENUINE-VENDOR-TP LIVE ACCEPTANCE FAILED (20-Aug-2026)**
 
 The Orchestrator-side deterministic gate is implemented. It validates frozen
 Builder output and never edits the DOCX.
@@ -312,37 +312,56 @@ Additional approved business rule:
 - internal vendor cost, margin, markup and buy-price fields must never appear
   in the customer document.
 
-19-Aug live evidence:
+20-Aug corrected live evidence:
+- input: controlled `Sample Vendor TP 1.pdf`, SHA-256
+  `ea9342af5effeba80991496e598e3dd79ea2c587ae2a2c73b9b3363fa10b8240`;
 - DOCX integrity: pass,
 - `Proposed BOQ -> Commercials -> Acceptance`: pass,
 - BOQ/commercial tables and frozen selling facts: pass,
 - prohibited internal commercial labels: pass,
 - approved RAG provenance contract: pass,
-- golden embedded-object floor: **fail — 3 inline shapes vs 16 required**,
-- visual review: **fail — 9-page output vs 26-page golden, nested synthetic CP
-  content and TOC/layout drift**,
+- generated DOCX SHA-256:
+  `8f86e53e0680a0bece5d32dfbb36150614c8fbdc6b11ce8bc490f51317b05a91`,
+- golden embedded-object floor: **fail — 5 `python-docx` inline shapes vs
+  16 required**,
+- direct OOXML comparison: **12 generated drawings (6 inline + 6 anchored)
+  versus 23 golden drawings (17 inline + 6 anchored)**,
+- raster visual review: still required; the bundled renderer could not run on
+  this Windows host because LibreOffice is not installed,
 - resulting state: `QUARANTINED`.
+
+The 19-Aug run that supplied a generated CP as the TP source is superseded. It
+proved that the gate quarantines a bad document, but it is not valid vendor-TP
+fidelity evidence.
 
 Acceptance:
 - TP output passes the agreed golden-fidelity/visual regression threshold before TP is treated as production-ready.
 
-The acceptance condition is not met. Do not waive or mark P1-20 passed from the
-synthetic transport test.
+The acceptance condition is not met. Do not waive or mark P1-20 passed. No
+Orchestrator change can restore objects absent from frozen Builder output; the
+external Builder owner must supply output that independently passes this gate.
 
 ---
 
 ## P1-21 — Document rendering worker feasibility / implementation
 
-Status: **IN PROGRESS - FOUNDATION IMPLEMENTED / CANDIDATE-VM ACCEPTANCE PENDING**
+Status: **FOUNDATION IMPLEMENTED / DEPLOYMENT DEFERRED AND CONDITIONAL**
 
 Do not automatically build the Windows/Office worker simply because Architecture v2.0 described it.
 
 P1-20 determined that the frozen Proposal Builder output does not satisfy the
-golden TP requirement. Because the Builder is frozen, proceed with the approved
-isolated rendering-worker feasibility path; do not patch or copy Builder logic
-into the Orchestrator.
+golden TP requirement. A rendering worker can update fields and export PDF but
+cannot add missing proposal content or embedded objects. It is therefore not a
+remedy for the current P1-20 failure. Do not patch or copy Builder logic into
+the Orchestrator.
 
-If still required:
+Proceed to a candidate VM only if both conditions are met:
+- the external Builder first produces a DOCX that passes P1-20 structural and
+  human visual acceptance;
+- the business confirms automatic PDF output is mandatory and the Builder
+  remains DOCX-only.
+
+If those conditions are met:
 - use the approved Windows document-worker feasibility tests,
 - isolate Office automation,
 - watchdog,
@@ -375,6 +394,7 @@ If still required:
   Windows/Office candidate VM and service account.
 
 Do not mark P1-21 passed until the candidate-VM gates and P1-20 TP gate pass.
+Do not deploy a candidate VM merely to attempt to repair Builder content.
 
 ---
 
@@ -476,8 +496,9 @@ Until email integration exists:
 
 # Immediate next engineering task
 
-Core Orchestrator implementation exists through P1-25; P1-21 is now the open
-production engineering item after the P1-20 live fidelity failure.
+Core Orchestrator implementation exists through P1-25. There is no valid
+Orchestrator code change that can repair the current P1-20 Builder-output
+fidelity failure. P1-21 is conditional, not the automatic next item.
 
 Production UAT preparation is now documented/configurable:
 - compose endpoint overrides for production `.env` values,
@@ -488,10 +509,15 @@ The Orchestrator remains in local Docker UAT while the Hyper-V host has only
 4.1 GB available RAM. Production-server deployment is deferred until the
 application is production-ready and dedicated VM capacity is approved.
 
-Immediate engineering action is P1-21 rendering-worker feasibility because the
-live frozen Builder TP failed P1-20 and was quarantined. P1-14 owner
-collection/review continues in parallel. Business-live remains blocked until:
-- P1-21 produces a TP that passes the P1-20 structural and visual gate,
+Immediate action is external acceptance remediation: the frozen Proposal
+Builder owner must produce a genuine-vendor-input TP that passes P1-20 without
+Orchestrator document-generation logic. P1-14 owner collection/review continues
+in parallel. The next Orchestrator backlog item that can be completed is P1-24
+once the real P1-14 labelled dataset is supplied. Business-live remains blocked
+until:
+- frozen Builder TP output passes the P1-20 structural and visual gate,
+- if automatic PDF is confirmed mandatory, conditional P1-21 candidate-VM
+  acceptance produces the final hash-tracked PDF,
 - P1-24 is run against the real P1-14 labelled historical dataset,
 - production backup/restore and security operations are validated on the target
   servers.

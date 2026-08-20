@@ -12,11 +12,11 @@ Current validated milestone:
 
 TP production-fidelity status:
 
-**P1-20 AUTOMATED GATE IMPLEMENTED; LIVE TP QUARANTINED (19-Aug-2026)**
+**P1-20 GATE IMPLEMENTED; GENUINE-VENDOR-TP LIVE ACCEPTANCE FAILED (20-Aug-2026)**
 
 Document-worker status:
 
-**P1-21 FOUNDATION IMPLEMENTED; CANDIDATE-VM ACCEPTANCE PENDING (19-Aug-2026)**
+**P1-21 FOUNDATION IMPLEMENTED; DEPLOYMENT DECISION DEFERRED/CONDITIONAL (20-Aug-2026)**
 
 Production-server UAT preparation:
 
@@ -32,7 +32,7 @@ Validated implementation branch:
 
 The exact task commit SHA is reported in the completion handoff after commit creation.
 
-Date of this validated baseline: 19-Aug-2026.
+Date of this validated baseline: 20-Aug-2026.
 
 ## Product boundary
 
@@ -161,12 +161,14 @@ The Orchestrator is the only coordinator between the Local LLM and Proposal Buil
   golden 16-inline-shape floor
 - failed document validation is persisted and moves the build and proposal to
   `QUARANTINED`; release remains blocked
-- the 19-Aug live TP passed section/table/commercial/provenance checks but had
-  only 3 inline shapes versus the golden requirement of 16 and therefore was
-  correctly quarantined
-- Word-rendered inspection found 9 output pages versus the 26-page golden,
-  nested synthetic CP content in the test appendix, an incorrect/stale TOC
-  page reference and visible layout drift; this output is not production-ready
+- the former 19-Aug run recycled generated CP output as the TP source. It proved
+  fail-closed quarantine but is superseded as fidelity evidence
+- the corrected 20-Aug run used a hash-pinned genuine vendor PDF. Its generated
+  TP passed section/table/commercial/provenance checks but had only 5
+  `python-docx` inline shapes versus the required 16 and was quarantined
+- direct OOXML comparison found 12 drawings in the generated TP versus 23 in
+  the golden template. Raster review remains required and could not run on the
+  UAT Windows host because LibreOffice is not installed
 
 ### Isolated Windows document-worker foundation
 - PostgreSQL-backed render jobs with idempotent request hashes, serialized
@@ -179,7 +181,7 @@ The Orchestrator is the only coordinator between the Local LLM and Proposal Buil
   Word supervisor and maintains its lease during rendering
 - rendered DOCX/PDF files return to a separate Orchestrator-controlled volume;
   size and SHA-256 are verified before PostgreSQL registration and completion
-- latest active suite: 83 passed, 19 expected opt-in/live skips; dedicated
+- latest active suite: 103 passed, 19 expected opt-in/live skips; dedicated
   P1-21 PostgreSQL queue tests: 2 passed
 - no worker service has been installed and no candidate-VM WT gate is claimed
 
@@ -259,20 +261,30 @@ document during takeover. It was not modified or included in Orchestrator work.
 
 ## Next implementation area
 
-**P1-E - Benchmarking and security**
+**Production exit gates / external P1-20 acceptance remediation**
 
 P1-25 Orchestrator security hardening is **passed**. It adds local file security
 screening/quarantine events, prompt-injection regression checks, RBAC policy
 verification helpers, restore-verification evidence, security event persistence,
 audit linkage and secrets-hygiene regression checks without cloud/SaaS scanners.
 
-Core Orchestrator implementation exists through P1-25. The former live Proposal
-Builder endpoint blocker is resolved through the frozen Builder's existing
-synchronous contracts, but production exit gates remain:
-- the P1-20 automatic gate is implemented, but its live golden-fidelity
-  acceptance failed and correctly quarantined the TP.
-- P1-21 is now required for production to resolve Word/PDF rendering and visual
-  fidelity without modifying the frozen Proposal Builder.
+Core Orchestrator implementation exists through P1-25. The frozen Proposal
+Builder endpoint is reachable through its existing synchronous contracts, but
+production exit gates remain:
+- the P1-20 automatic gate is implemented. On 20-Aug a corrected live test used
+  a genuine, hash-pinned vendor TP PDF from the controlled quote archive. The
+  generated TP passed section order, tables, approved selling facts, prohibited
+  internal-label and RAG-provenance checks, but failed the embedded-object gate
+  and was correctly quarantined. It contains 12 drawings (6 inline and 6
+  anchored) versus the golden template's 23 drawings (17 inline and 6
+  anchored); the enforced `python-docx` metric is 5 versus the required 16.
+- the earlier 19-Aug run passed a generated CP back to the TP endpoint. It was
+  valid fail-closed/quarantine evidence but is not valid TP fidelity evidence
+  and is superseded by the corrected 20-Aug result.
+- P1-21 cannot repair missing TP content or embedded objects and is not the
+  remedy for this P1-20 failure. Its foundation is retained, but candidate-VM
+  deployment is deferred unless a golden-compliant Builder DOCX first exists
+  and the business confirms automatic PDF output is mandatory.
 - P1-21 now has an Orchestrator-owned immutable render contract, durable
   PostgreSQL queue, token-isolated worker API, lease/heartbeat/recovery,
   hash-verified artifact return, serialized Word runner, exact-PID watchdog
@@ -281,8 +293,9 @@ synchronous contracts, but production exit gates remain:
   cleanly quarantined with no ghost Word process. A Builder CP working copy
   opened, updated, repaginated and saved, but Word PDF export did not return
   within 180 seconds and was also cleanly quarantined. This is feasibility
-  evidence, not acceptance; WT-1, WT-2, WT-4 and WT-7 still require a dedicated
-  candidate Windows/Office VM and service account.
+  evidence, not acceptance. WT-1, WT-2, WT-4 and WT-7 remain unexecuted and
+  must not trigger candidate-VM deployment until the conditional need above is
+  confirmed.
 - P1-24 requires the real P1-14 labelled historical dataset benchmark run.
 - Production ops controls such as ClamAV/Wazuh/full isolated restore drills
   remain deployment/operations activities.
@@ -316,6 +329,7 @@ From Phase 0:
 - signed approval worksheet AM-1
 - 30–50 historical evaluation deals
 - final golden AMC confirmation
-- Windows/Office document-worker decision and candidate VM for P1-21
+- confirmation whether automatic PDF delivery is mandatory; only then decide
+  whether a P1-21 Windows/Office candidate VM is needed
 
 These do not block all coding, but dependent acceptance tests cannot be signed off without them.

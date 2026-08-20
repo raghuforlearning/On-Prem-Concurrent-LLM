@@ -266,8 +266,29 @@ P1-20 operations:
 - any failed validation is persisted and changes the build/proposal state to
   `QUARANTINED`. Do not manually promote it or prepare a release package.
 - structural success does not replace visual review. The 19-Aug synthetic live
-  output is known to fail the golden gate (3/16 inline shapes) and must not be
-  used as a customer document.
+  run incorrectly reused generated CP output as the TP source; it remains valid
+  quarantine evidence but is not TP fidelity evidence.
+- the corrected opt-in live test requires a genuine vendor PDF/DOCX staged in
+  `/srv/data/rfp_archive` or `/srv/data/quote_archive`, plus its pinned SHA-256:
+  `P119_TEST_VENDOR_TP_PATH` and `P119_TEST_VENDOR_TP_SHA256`. It deliberately
+  rejects files under `PROPOSAL_BUILDER_ARTIFACT_ROOT`, so generated CP output
+  cannot be recycled as a TP fixture.
+- run the corrected test only after verifying Builder `/api/env` returns the
+  expected environment. From `build/p1-25/app`, use the ignored `.env` and pass
+  the live-test values only to the one-off test container:
+
+  ```powershell
+  docker compose --env-file .env run --rm --no-deps `
+    -e P119_TEST_EXISTING_BUILDER_LIVE=1 `
+    -e P119_TEST_VENDOR_TP_PATH=/srv/data/quote_archive/vendor-tp.pdf `
+    -e P119_TEST_VENDOR_TP_SHA256=<verified-lowercase-sha256> `
+    api python -m unittest tests.test_p119_existing_builder_live -v
+  ```
+
+- 20-Aug corrected live evidence used a hash-pinned vendor TP PDF. The output
+  passed order, tables, selling facts, leakage and provenance checks but was
+  quarantined at 5/16 `python-docx` inline shapes. Direct OOXML comparison found
+  12 generated drawings versus 23 in the golden template. Do not release it.
 
 P1-22 operations:
 - proposal release is human-controlled. The Orchestrator records release
@@ -335,21 +356,24 @@ Only after review should Codex begin P1-C implementation.
 
 ## 13. Current next engineering priority
 
-**P1-21 rendering-worker feasibility**
+**P1-20 external acceptance remediation / conditional P1-21**
 
 The Orchestrator P1 foundation is complete through P1-25. Remaining work is:
-the P1-20 gate is implemented and its live TP failed golden fidelity, so P1-21
-is required for production. P1-24 still needs the real P1-14 labelled
-historical dataset benchmark run. Production security operations such as
-ClamAV/Wazuh/full isolated restore drills must be validated on the target
-servers before production sign-off.
+the P1-20 gate is implemented and a genuine-vendor-input live TP still failed
+golden fidelity. A render worker cannot recreate missing proposal content or
+embedded objects, so P1-21 is not the automatic remedy. The external frozen
+Builder owner must first produce a DOCX that independently passes P1-20. P1-24
+still needs the real P1-14 labelled historical dataset benchmark run.
+Production security operations such as ClamAV/Wazuh/full isolated restore
+drills must be validated on the target servers before production sign-off.
 
 The current UAT stays local in Docker. The 14-Aug-2026 Hyper-V assessment found
 4.1 GB available RAM, which is insufficient for the recommended dedicated
 Orchestrator VM. Do not place the Orchestrator inside the frozen AI Inference or
 Proposal Builder VMs. Reassess capacity when the system is production-ready.
 
-P1-21 worker operations:
+P1-21 worker operations, only if a compliant Builder DOCX exists and automatic
+PDF delivery is confirmed mandatory:
 - the implementation and current WT matrix are in
   `docs/P1-21-Windows-Document-Worker-Feasibility.md`;
 - never run the Office worker when an unmanaged `WINWORD.EXE` process already
@@ -361,8 +385,9 @@ P1-21 worker operations:
   mismatch, unexpected artifact or Office failure;
 - a quarantined job is not releasable and must not be manually relabelled
   passed;
-- do not deploy the worker as a service or run reboot tests until IT approves
-  the candidate Windows VM, licensed Office and low-privilege service account.
+- do not deploy the worker as a service or run reboot tests until the two
+  conditional entry gates above are met and IT approves the candidate Windows
+  VM, licensed Office and low-privilege service account.
 
 P1-21 code-side worker configuration (candidate VM only after approval):
 - set `DOCUMENT_WORKER_TOKEN` to the same dedicated random value in the ignored
