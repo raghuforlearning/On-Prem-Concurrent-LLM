@@ -292,10 +292,12 @@ Acceptance:
 
 ## P1-20 — TP golden-fidelity gate
 
-Status: **AUTOMATED GATE IMPLEMENTED / GENUINE-VENDOR-TP LIVE ACCEPTANCE FAILED (20-Aug-2026)**
+Status: **SOURCE-AWARE V2 GATE IMPLEMENTED / LIVE RE-ACCEPTANCE PENDING (26-Aug-2026)**
 
 The Orchestrator-side deterministic gate is implemented. It validates frozen
-Builder output and never edits the DOCX.
+Builder output and never edits the DOCX. The 26-Aug v2 profile replaces the
+invalid global 16-inline-shape floor with source-aware and relationship-level
+evidence.
 
 Use frozen Proposal Builder output.
 
@@ -312,7 +314,26 @@ Additional approved business rule:
 - internal vendor cost, margin, markup and buy-price fields must never appear
   in the customer document.
 
-20-Aug corrected live evidence:
+26-Aug v2 implementation evidence:
+- TP handoff now requires an explicit masked client code, real-name aliases and
+  `mask_client=true`; the adapter maps them to the frozen Builder's existing
+  `clientRealName`, `clientAliases` and `maskClient` multipart fields;
+- all Word stories, including headers and text boxes, are scanned for surviving
+  real-client aliases; only alias ordinals are reported to avoid leaking names
+  into logs;
+- commercial values are compared as exact normalized `Decimal` tokens, so
+  `120000.00` correctly matches rendered `120,000.00` without weakening the
+  money gate;
+- image relationships must resolve to non-empty, decodable, non-blank media;
+  header/footer branding does not count as preserved vendor content;
+- detected graphics in the hash-verified vendor PDF/DOCX are compared with
+  main-document drawings in the returned DOCX; no fixed golden object count is
+  assumed across unrelated vendor documents;
+- focused tests: 20 passed; P1-19 through P1-22 offline regressions: 42 passed,
+  one expected live skip; complete suite: 109 passed, two expected opt-in live
+  skips against disposable PostgreSQL 16/pgvector with the P1-02 audit schema.
+
+Historical 20-Aug v1 live evidence:
 - input: controlled `Sample Vendor TP 1.pdf`, SHA-256
   `ea9342af5effeba80991496e598e3dd79ea2c587ae2a2c73b9b3363fa10b8240`;
 - DOCX integrity: pass,
@@ -322,8 +343,8 @@ Additional approved business rule:
 - approved RAG provenance contract: pass,
 - generated DOCX SHA-256:
   `8f86e53e0680a0bece5d32dfbb36150614c8fbdc6b11ce8bc490f51317b05a91`,
-- golden embedded-object floor: **fail — 5 `python-docx` inline shapes vs
-  16 required**,
+- the retired golden embedded-object floor reported **5 `python-docx` inline
+  shapes vs 16 required**,
 - direct OOXML comparison: **12 generated drawings (6 inline + 6 anchored)
   versus 23 golden drawings (17 inline + 6 anchored)**,
 - raster visual review: still required; the bundled renderer could not run on
@@ -337,9 +358,12 @@ fidelity evidence.
 Acceptance:
 - TP output passes the agreed golden-fidelity/visual regression threshold before TP is treated as production-ready.
 
-The acceptance condition is not met. Do not waive or mark P1-20 passed. No
-Orchestrator change can restore objects absent from frozen Builder output; the
-external Builder owner must supply output that independently passes this gate.
+The acceptance condition is not met. Do not waive or mark P1-20 passed. The
+reviewed 25-Aug Builder artifact was created without the masking metadata and
+still contains real-customer references. Regenerate it through the revised
+Orchestrator contract, pass the v2 structural report, then complete human
+page-by-page visual approval. The Orchestrator must not repair or rewrite the
+Builder DOCX.
 
 ---
 
@@ -509,12 +533,12 @@ The Orchestrator remains in local Docker UAT while the Hyper-V host has only
 4.1 GB available RAM. Production-server deployment is deferred until the
 application is production-ready and dedicated VM capacity is approved.
 
-Immediate action is external acceptance remediation: the frozen Proposal
-Builder owner must produce a genuine-vendor-input TP that passes P1-20 without
-Orchestrator document-generation logic. P1-14 owner collection/review continues
-in parallel. The next Orchestrator backlog item that can be completed is P1-24
-once the real P1-14 labelled dataset is supplied. Business-live remains blocked
-until:
+Immediate action is live v2 acceptance: regenerate a genuine-vendor-input TP
+through the Orchestrator using the explicit client-masking metadata, verify the
+source-aware structural report, and complete page-by-page human visual review.
+P1-14 owner collection/review continues in parallel. The next independent
+Orchestrator backlog item that can be completed is P1-24 once the real P1-14
+labelled dataset is supplied. Business-live remains blocked until:
 - frozen Builder TP output passes the P1-20 structural and visual gate,
 - if automatic PDF is confirmed mandatory, conditional P1-21 candidate-VM
   acceptance produces the final hash-tracked PDF,

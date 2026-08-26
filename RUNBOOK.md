@@ -230,6 +230,11 @@ P1-19 operations:
   `artifact_ref`, SHA-256 and optional filename. The adapter accepts only PDF or
   DOCX files inside the configured controlled roots, verifies size and hash,
   then uploads the file to the frozen Builder.
+- TP also requires an explicit customer identity contract in the frozen
+  Builder context: the masked `client_name` code, `client_real_name`,
+  `client_aliases` and `mask_client=true`. The adapter maps these to the
+  existing Builder multipart fields; do not place aliases in source control or
+  logs.
 - `POST /proposals/{type}/assemble` must have an active accepted quote,
   current deterministic quote validation, approved `PROPOSAL_VALUE` approval
   and a satisfied Deal Registration gate.
@@ -259,10 +264,13 @@ P1-20 operations:
   total with `Decimal`; no LLM participates in commercial arithmetic.
 - TP also requires approved `rag_provenance` with draft/retrieval IDs,
   reviewer and review timestamp.
-- generated TP output must pass `p1-20.tp-golden.v1`: valid DOCX, immediate
+- generated TP output must pass `p1-20.tp-source-aware.v2`: valid DOCX, immediate
   `Proposed BOQ -> Commercials -> Acceptance` order, required BOQ/commercial
-  tables, exact frozen selling facts, no internal commercial labels, approved
-  RAG provenance and at least 16 inline shapes.
+  tables, numerically exact frozen selling facts despite display commas, no
+  internal commercial labels, approved RAG provenance, no surviving real-name
+  client alias in any Word story, valid embedded-image relationships and source
+  graphic preservation evidence. There is no global 16-shape minimum because
+  genuine vendor documents contain different numbers of diagrams.
 - any failed validation is persisted and changes the build/proposal state to
   `QUARANTINED`. Do not manually promote it or prepare a release package.
 - structural success does not replace visual review. The 19-Aug synthetic live
@@ -285,10 +293,12 @@ P1-20 operations:
     api python -m unittest tests.test_p119_existing_builder_live -v
   ```
 
-- 20-Aug corrected live evidence used a hash-pinned vendor TP PDF. The output
-  passed order, tables, selling facts, leakage and provenance checks but was
-  quarantined at 5/16 `python-docx` inline shapes. Direct OOXML comparison found
-  12 generated drawings versus 23 in the golden template. Do not release it.
+- The 20-Aug result is historical evidence for the retired v1 shape-floor
+  profile only. The 25-Aug reviewed Builder artifact still contained real
+  client aliases because its generation fixture did not supply the masking
+  contract. Regenerate through the Orchestrator with the required identity
+  fields, then run v2 structural validation and page-by-page human visual
+  review. Do not release the reviewed artifact.
 
 P1-22 operations:
 - proposal release is human-controlled. The Orchestrator records release

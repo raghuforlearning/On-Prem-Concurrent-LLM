@@ -787,3 +787,43 @@ collection remains a parallel owner/data activity.
 
 - Off-site laptop (10.212.134.200) had no route to the air-gapped 192.168.71.x segment; execution shifted to guided mode (Raghu's hands, Kimi's commands) — kept as the working pattern for VM-side tasks.
 - Artifacts from the blocked period retained for reuse: `build/p1-01/vm-validate.sh` (generic acceptance checker — RAM threshold updated to 36 GiB), `build/p1-01/vm-resize-hyperv.ps1` (reference runbook; actual resize was done interactively).
+
+---
+
+**P1-20 remediation — source-aware TP validation v2 — ✅ CODE/TEST PASSED, LIVE RE-ACCEPTANCE PENDING (26-Aug-2026)**
+
+### Built (`build/p1-25/app/`)
+
+- Existing Proposal Builder adapter now requires an auditable TP customer
+  identity contract and maps the masked code, real name, aliases and masking
+  flag to the frozen Builder's existing multipart API fields.
+- Returned DOCX validation scans all Word XML stories for surviving aliases
+  without echoing the protected names into validation logs.
+- Exact commercial comparison now parses rendered numbers as `Decimal` values,
+  allowing display separators such as `120,000.00` while preserving equality.
+- The invalid global 16-inline-shape floor was removed. The v2 gate verifies
+  image relationship integrity, rejects broken/corrupt/large blank media, and
+  compares detected source PDF/DOCX graphics with drawings in the main document
+  story so template header/footer logos cannot satisfy preservation.
+- The Builder remains frozen and the Orchestrator never edits generated DOCX.
+
+### Acceptance evidence
+
+| Test | Result |
+|---|---|
+| Focused P1-19/P1-20 adapter and fidelity tests | **20 passed** |
+| P1-19 through P1-22 offline regression suite | **42 passed, 1 expected live skip** |
+| Complete active image against disposable PostgreSQL 16/pgvector + P1-02 audit schema | **109 passed, 2 expected opt-in live skips** |
+| Missing client masking contract | Rejected before Builder call |
+| Alias surviving in DOCX | `masked_client_identity` fails closed |
+| Formatted money | Exact numeric facts pass without string-format false negative |
+| Source graphic loss / missing source evidence | Quarantined |
+| Broken DOCX media target | Rejected as invalid package |
+
+### Still required
+
+- Regenerate the genuine vendor TP through this revised Orchestrator contract.
+- Obtain a passing `p1-20.tp-source-aware.v2` report.
+- Complete page-by-page human visual approval, including distributor identity,
+  split-table and final BOQ/commercial/acceptance review.
+- Do not release the previously reviewed unmasked Builder artifact.

@@ -130,6 +130,10 @@ def _live_payload(proposal_type):
     if proposal_type == "TP":
         builder_context.update(
             {
+                "client_name": "CUS999",
+                "client_real_name": "NationLabs Internal UAT",
+                "client_aliases": ["NationLabs Internal UAT"],
+                "mask_client": True,
                 "customer_commercials": {
                     "currency": "AED",
                     "subtotal": "100.00",

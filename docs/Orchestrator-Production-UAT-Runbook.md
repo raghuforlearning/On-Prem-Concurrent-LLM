@@ -159,10 +159,15 @@ Minimum smoke test sequence:
 12. Generate CP and AMC through the existing synchronous Builder transport.
 13. For TP, select a supplier TP PDF/DOCX already archived under a controlled
     Orchestrator artifact root and include its artifact ref and SHA-256 in the
-    frozen proposal context.
+    frozen proposal context. Also include the masked customer code,
+    `client_real_name`, the approved `client_aliases` list and
+    `mask_client=true`; the TP build must fail closed if these are absent.
 14. Confirm each returned DOCX is archived with a matching SHA-256. Do not treat
     the DOCX-only result as a release-ready package until the required PDF is
     also present.
+15. Confirm TP validation profile `p1-20.tp-source-aware.v2` passed and complete
+    a page-by-page visual review. A structural pass alone is not release
+    approval.
 15. Record a restore verification evidence event after backup/restore testing.
 
 ## Production-live gates

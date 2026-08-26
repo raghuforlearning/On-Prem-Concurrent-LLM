@@ -197,6 +197,48 @@ def _require_approved_rag_provenance(context: dict[str, Any]) -> None:
         raise ValueError(f"TP generation requires approved RAG provenance: {detail}")
 
 
+def _approved_tp_identity(context: dict[str, Any]) -> dict[str, Any]:
+    """Return the explicit customer-masking contract for a TP build.
+
+    The frozen Builder already accepts these fields.  Keeping them in the
+    frozen Orchestrator payload makes the masking decision auditable and lets
+    the returned-document gate independently prove that no real-name alias
+    survived.
+    """
+    client_code = _text(context.get("client_name") or context.get("client"))
+    if not client_code:
+        raise ValueError("TP generation requires a masked client code")
+    if not _boolean(context.get("mask_client"), False):
+        raise ValueError("TP generation requires mask_client=true")
+
+    raw_aliases = context.get("client_aliases")
+    if isinstance(raw_aliases, str):
+        aliases = [item.strip() for item in raw_aliases.splitlines() if item.strip()]
+    elif isinstance(raw_aliases, (list, tuple)):
+        aliases = [_text(item) for item in raw_aliases if _text(item)]
+    else:
+        aliases = []
+    real_name = _text(context.get("client_real_name"))
+    if real_name:
+        aliases.insert(0, real_name)
+
+    unique_aliases: list[str] = []
+    seen: set[str] = set()
+    for alias in aliases:
+        key = alias.casefold()
+        if key == client_code.casefold() or key in seen:
+            continue
+        seen.add(key)
+        unique_aliases.append(alias)
+    if not unique_aliases:
+        raise ValueError("TP generation requires at least one real client alias for masking")
+    return {
+        "client_code": client_code,
+        "client_real_name": real_name or unique_aliases[0],
+        "client_aliases": unique_aliases,
+    }
+
+
 def _safe_filename(content_disposition: str, fallback: str) -> str:
     encoded = re.search(r"filename\*=UTF-8''([^;]+)", content_disposition, re.I)
     quoted = re.search(r'filename="([^"]+)"', content_disposition, re.I)
@@ -286,6 +328,9 @@ class ExistingProposalBuilderClient(ProposalBuilderClient):
         if normalized_type == "TP":
             commercial = _approved_tp_commercials(context)
             _require_approved_rag_provenance(context)
+            tp_identity = _approved_tp_identity(context)
+        else:
+            tp_identity = None
 
         proposal_number = _text(
             context.get("proposal_number") or context.get("prop_num") or context.get("propNum")
@@ -373,6 +418,18 @@ class ExistingProposalBuilderClient(ProposalBuilderClient):
             "expectedValue": _number(commercial.get("aed_total"), "commercial.aed_total"),
             "includeAssumptions": _boolean(context.get("include_assumptions"), True),
         }
+        if tp_identity is not None:
+            # The existing Builder multipart endpoint expects aliases as a
+            # newline-delimited field and parses maskClient from the string
+            # value emitted by _multipart_fields().
+            request.update(
+                {
+                    "client": tp_identity["client_code"],
+                    "clientRealName": tp_identity["client_real_name"],
+                    "clientAliases": "\n".join(tp_identity["client_aliases"]),
+                    "maskClient": True,
+                }
+            )
 
         if normalized_type in {"CP", "TP"}:
             request["showPartNumber"] = _text(context.get("show_part_number")) or "auto"
@@ -633,6 +690,8 @@ class ExistingProposalBuilderClient(ProposalBuilderClient):
                     content,
                     request_payload=request_payload,
                     frozen_payload=payload,
+                    source_content=source_artifact["content"] if source_artifact else None,
+                    source_filename=source_artifact["filename"] if source_artifact else None,
                 )
             else:
                 fidelity_validation = {

@@ -119,6 +119,10 @@ def _frozen_payload(proposal_type="CP"):
     if proposal_type == "TP":
         context["proposal_builder"].update(
             {
+                "client_name": "CUS999",
+                "client_real_name": "NationLabs UAT",
+                "client_aliases": ["NationLabs UAT"],
+                "mask_client": True,
                 "customer_commercials": {
                     "currency": "AED",
                     "subtotal": "150.00",
@@ -348,6 +352,10 @@ class ExistingProposalBuilderContractTests(unittest.TestCase):
             self.assertEqual(kwargs["files"]["file"][0], source_path.name)
             self.assertEqual(kwargs["files"]["file"][1], source_content)
             self.assertEqual(json.loads(kwargs["data"]["boq"])[0]["total"], "150.00")
+            self.assertEqual(kwargs["data"]["client"], "CUS999")
+            self.assertEqual(kwargs["data"]["clientRealName"], "NationLabs UAT")
+            self.assertEqual(kwargs["data"]["clientAliases"], "NationLabs UAT")
+            self.assertEqual(kwargs["data"]["maskClient"], "true")
 
     def test_tp_source_artifact_must_be_inside_controlled_roots(self):
         with tempfile.TemporaryDirectory() as artifacts, tempfile.TemporaryDirectory() as outside:

@@ -46,7 +46,7 @@ class FakeBuilderAdapter:
                 "passed": self.validation_passed,
                 "checks": [
                     {
-                        "name": "golden_inline_shape_floor",
+                        "name": "source_graphics_preserved",
                         "passed": self.validation_passed,
                     }
                 ],
