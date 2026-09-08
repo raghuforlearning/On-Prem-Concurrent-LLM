@@ -23,6 +23,8 @@ the validated implementation baseline unless a takeover audit proves otherwise.
 - [x] P1-11 — configuration-driven approval engine
 - [x] P1-12 — follow-up regression fixes
 - [x] P1-13 — human review UI + file intake/OCR provenance
+  - 08-Sep-2026 clarification Set-button regression fixed and revalidated in
+    local Docker UAT; active suite 93 passed, 19 expected skips.
 - [x] P1-15 — frozen Proposal Builder adapter + quote lifecycle/provenance/versioning
 - [x] P1-16 — deterministic quote validation + review/audit workflow
 - [x] P1-17 — approved-content pgvector RAG + queued grounded drafting

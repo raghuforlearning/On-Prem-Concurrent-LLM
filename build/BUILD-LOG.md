@@ -5,6 +5,20 @@ Rules: one backlog item at a time · acceptance test must pass before next item 
 
 ---
 
+## P1-13 - Clarification Set-button regression fix - PASSED (08-Sep-2026)
+
+- Corrected the review-board clarification handler to use literal DOM element
+  IDs for dotted field paths such as `customer.contact_name`.
+- Added an explicit missing-input alert and API error feedback so clarification
+  failures are no longer silent.
+- Verified the fix against local Docker UAT: `customer.contact_name=Mohammad`
+  persisted for `NL-OPP-2026-0001`, readiness changed from 30 to 35 and open
+  clarifications changed from seven to six.
+- Active Orchestrator suite: **93 passed, 19 expected opt-in/live skips**.
+- No Local LLM Platform or Proposal Builder source/configuration was changed.
+
+---
+
 ## P1-20 - Live fixture correction / genuine vendor-TP acceptance - BLOCKED EXTERNALLY (20-Aug-2026)
 
 ### Corrected (`build/p1-25/app/`)

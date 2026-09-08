@@ -213,11 +213,22 @@ async function viewDraft(ref) {
   alert(r?.draft_preview ? r.draft_preview + '…' : 'No draft');
 }
 async function answer(field) {
-  const v = document.getElementById('ans_' + CSS.escape(field)).value.trim();
+  // getElementById expects the literal id, not a CSS selector. Escaping dotted
+  // clarification paths (for example customer.contact_name) prevents lookup.
+  const input = document.getElementById('ans_' + field);
+  if (!input) {
+    alert(`Unable to find the clarification input for ${field}.`);
+    return;
+  }
+  const v = input.value.trim();
   if (!v) return;
-  await post(`/opportunities/${current}/clarifications`, {answers: {[field]: v}});
-  selectOpp(current);
-  refreshOpps();
+  const r = await post(`/opportunities/${current}/clarifications`, {answers: {[field]: v}});
+  if (r.detail || r.error) {
+    alert(r.detail || `${r.error}: ${r.detail || 'Unable to save clarification.'}`);
+    return;
+  }
+  await selectOpp(current);
+  await refreshOpps();
 }
 
 async function refreshApprovals() {

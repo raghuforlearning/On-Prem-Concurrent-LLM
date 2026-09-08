@@ -34,6 +34,11 @@ The exact task commit SHA is reported in the completion handoff after commit cre
 
 Date of this validated baseline: 26-Aug-2026.
 
+Operational validation update (08-Sep-2026): the P1-13 review-board
+clarification Set-button regression for dotted field paths was corrected and
+deployed to local Docker UAT. A live clarification persisted successfully and
+the active suite passed 93 tests with 19 expected opt-in/live skips.
+
 ## Product boundary
 
 There are three separate systems:
