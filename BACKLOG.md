@@ -268,7 +268,7 @@ Acceptance:
 
 ## P1-19 — Proposal Builder handoff
 
-Status: **PASSED - LIVE EXISTING BUILDER TRANSPORT (18-Aug-2026)**
+Status: **PASSED - LIVE EXISTING BUILDER TRANSPORT; CP COMMERCIAL SAFETY HARDENED (09-Sep-2026)**
 
 Architecture:
 - Proposal Builder remains frozen.
@@ -296,6 +296,15 @@ Acceptance:
 - returned DOCX artifacts are content-addressed and archived with validation metadata,
 - no Proposal Builder source or runtime configuration is modified.
 
+09-Sep-2026 hardening evidence:
+- CP and TP now fail closed unless `customer_commercials` is backed by an
+  approved costing-sheet hash, approver and approval timestamp;
+- the selected vendor quote remains auditable procurement evidence but is not
+  mapped to customer-facing CP/TP BOQ pricing;
+- focused rebuilt-image P1-19/P1-20 tests passed 21/21;
+- live local-UAT CP used AED 1,567,365.88 from the approved costing snapshot,
+  not the selected vendor quote's AED 53,618.50 snapshot.
+
 ---
 
 ## P1-20 — TP golden-fidelity gate
@@ -318,7 +327,7 @@ Validate:
 
 Additional approved business rule:
 - `Commercials` must immediately follow `Proposed BOQ`,
-- TP customer prices must come from an approved costing-sheet snapshot,
+- CP and TP customer prices must come from an approved costing-sheet snapshot,
 - internal vendor cost, margin, markup and buy-price fields must never appear
   in the customer document.
 
@@ -372,6 +381,16 @@ still contains real-customer references. Regenerate it through the revised
 Orchestrator contract, pass the v2 structural report, then complete human
 page-by-page visual approval. The Orchestrator must not repair or rewrite the
 Builder DOCX.
+
+09-Sep-2026 genuine Verloop/GSPC UAT evidence:
+- CP completed and is pending human review with the approved customer total;
+- TP passed DOCX integrity, section order, BOQ/commercial presence, exact
+  customer money, masked identity, prohibited-label, approved-RAG and embedded
+  relationship checks;
+- TP failed `source_graphics_preserved` and was quarantined. The vendor PDF has
+  repeated image objects, but visual comparison also confirmed omitted
+  meaningful slides (indicative timeline, implementation-team responsibilities,
+  support process and the full Flyin case-study slide). Do not release it.
 
 ---
 

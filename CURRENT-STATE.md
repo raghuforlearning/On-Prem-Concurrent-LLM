@@ -48,6 +48,15 @@ with 2 expected live skips, the opt-in live Ollama adapter test passed, and UAT
 Job 4 completed as Draft 1 with five persisted citations to approved GSPC
 Document 2. Jobs 1-3 remain preserved as failure/audit history.
 
+Operational validation update (09-Sep-2026): the Proposal Builder adapter now
+requires the separately approved costing-sheet snapshot for both CP and TP.
+The selected vendor quote remains procurement evidence and can no longer become
+customer-facing CP pricing. Local UAT CP generation completed with the approved
+AED 1,567,365.88 total and is pending human review. Genuine-source TP generation
+passed every deterministic gate except source-graphic preservation and remains
+quarantined; visual inspection confirmed omitted meaningful vendor slides, so
+the gate was not waived.
+
 ## Product boundary
 
 There are three separate systems:
@@ -163,7 +172,7 @@ The Orchestrator is the only coordinator between the Local LLM and Proposal Buil
 - live CP and AMC synthetic transport acceptance passed on 18-Aug-2026
 
 ### TP golden-fidelity and customer-commercial safety
-- TP requires a distinct approved customer-facing costing snapshot; the
+- CP and TP require a distinct approved customer-facing costing snapshot; the
   accepted vendor quote is not used as customer selling price
 - deterministic quantity x unit price, subtotal, VAT and grand-total checks
   run before the frozen Builder is called

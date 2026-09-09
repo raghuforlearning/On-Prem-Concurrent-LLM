@@ -116,6 +116,35 @@ def _frozen_payload(proposal_type="CP"):
             "include_assumptions": False,
         }
     }
+    if proposal_type in {"CP", "TP"}:
+        context["proposal_builder"]["customer_commercials"] = {
+            "currency": "AED",
+            "subtotal": "150.00",
+            "vat_rate": "5.00",
+            "vat_amount": "7.50",
+            "grand_total": "157.50",
+            "terms": {
+                "payment": "30 days",
+                "validity": "30 days",
+                "delivery": "2 weeks",
+            },
+            "line_items": [
+                {
+                    "line_no": 1,
+                    "part_number": "TEST-1",
+                    "description": "Synthetic customer line",
+                    "quantity": "2",
+                    "unit_price": "75.00",
+                    "line_total": "150.00",
+                }
+            ],
+            "authority": {
+                "kind": "APPROVED_COSTING_SHEET",
+                "source_sha256": "c" * 64,
+                "approved_by": "finance.test",
+                "approved_at": "2026-08-18T10:00:00+04:00",
+            },
+        }
     if proposal_type == "TP":
         context["proposal_builder"].update(
             {
@@ -123,34 +152,6 @@ def _frozen_payload(proposal_type="CP"):
                 "client_real_name": "NationLabs UAT",
                 "client_aliases": ["NationLabs UAT"],
                 "mask_client": True,
-                "customer_commercials": {
-                    "currency": "AED",
-                    "subtotal": "150.00",
-                    "vat_rate": "5.00",
-                    "vat_amount": "7.50",
-                    "grand_total": "157.50",
-                    "terms": {
-                        "payment": "30 days",
-                        "validity": "30 days",
-                        "delivery": "2 weeks",
-                    },
-                    "line_items": [
-                        {
-                            "line_no": 1,
-                            "part_number": "TEST-1",
-                            "description": "Synthetic customer line",
-                            "quantity": "2",
-                            "unit_price": "75.00",
-                            "line_total": "150.00",
-                        }
-                    ],
-                    "authority": {
-                        "kind": "APPROVED_COSTING_SHEET",
-                        "source_sha256": "c" * 64,
-                        "approved_by": "finance.test",
-                        "approved_at": "2026-08-18T10:00:00+04:00",
-                    },
-                },
                 "rag_provenance": {
                     "status": "APPROVED",
                     "draft_id": 1,
@@ -222,7 +223,7 @@ class ExistingProposalBuilderContractTests(unittest.TestCase):
                     payload_hash=_hash(payload),
                 )
                 self.assertEqual(mapped["type"], proposal_type)
-                if proposal_type == "TP":
+                if proposal_type in {"CP", "TP"}:
                     self.assertEqual(mapped["terms"]["currency"], "AED")
                     self.assertEqual(mapped["boq"][0]["up"], "75.00")
                     self.assertEqual(mapped["boq"][0]["total"], "150.00")
@@ -288,7 +289,7 @@ class ExistingProposalBuilderContractTests(unittest.TestCase):
             self.assertEqual(created["job_id"], repeated["job_id"])
             self.assertEqual(len(session.calls), 2)
             self.assertTrue(session.calls[1][1].endswith("/api/generate"))
-            self.assertEqual(session.calls[1][2]["json"]["boq"][0]["total"], "100.00")
+            self.assertEqual(session.calls[1][2]["json"]["boq"][0]["total"], "150.00")
             self.assertEqual(client.get_build(created["job_id"])["state"], "done")
             artifacts = client.get_artifacts(created["job_id"])
             self.assertEqual(artifacts["docx_sha256"], hashlib.sha256(docx).hexdigest())
@@ -402,6 +403,26 @@ class ExistingProposalBuilderContractTests(unittest.TestCase):
             )
             self.assertFalse(result["valid"])
             self.assertIn("does not match", result["errors"][0])
+
+    def test_cp_without_approved_customer_commercials_is_rejected(self):
+        payload = _frozen_payload("CP")
+        del payload["context"]["proposal_builder"]["customer_commercials"]
+        with tempfile.TemporaryDirectory() as directory:
+            client = ExistingProposalBuilderClient(
+                "http://builder",
+                "svc",
+                "secret",
+                artifact_root=directory,
+                session=FakeSession([]),
+            )
+            result = client.validate_build(
+                proposal_type="CP",
+                template_version="template-v1",
+                payload=payload,
+                payload_hash=_hash(payload),
+            )
+            self.assertFalse(result["valid"])
+            self.assertIn("approved costing sheet", result["errors"][0])
 
     def test_sync_build_rejects_non_docx_response(self):
         payload = _frozen_payload("CP")

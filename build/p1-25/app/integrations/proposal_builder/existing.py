@@ -94,12 +94,12 @@ def _decimal(value: Any, field: str) -> Decimal:
     return number
 
 
-def _approved_tp_commercials(context: dict[str, Any]) -> dict[str, Any]:
+def _approved_customer_commercials(context: dict[str, Any]) -> dict[str, Any]:
     """Validate the customer-facing snapshot supplied by the costing workflow."""
     snapshot = context.get("customer_commercials")
     if not isinstance(snapshot, dict):
         raise ValueError(
-            "TP generation requires context.proposal_builder.customer_commercials "
+            "CP/TP generation requires context.proposal_builder.customer_commercials "
             "from an approved costing sheet"
         )
     forbidden = sorted(_INTERNAL_COMMERCIAL_KEYS.intersection(snapshot))
@@ -322,11 +322,17 @@ class ExistingProposalBuilderClient(ProposalBuilderClient):
             raise ValueError("payload_hash does not match the frozen payload")
 
         context = cls._builder_context(payload)
-        commercial = payload.get("commercial")
-        if not isinstance(commercial, dict):
+        accepted_quote_commercial = payload.get("commercial")
+        if not isinstance(accepted_quote_commercial, dict):
             raise ValueError("frozen payload has no commercial snapshot")
+        if normalized_type in {"CP", "TP"}:
+            # The selected vendor quote is procurement evidence, not the
+            # customer selling price.  Both customer-facing proposal types
+            # must use the separately approved costing-sheet snapshot.
+            commercial = _approved_customer_commercials(context)
+        else:
+            commercial = accepted_quote_commercial
         if normalized_type == "TP":
-            commercial = _approved_tp_commercials(context)
             _require_approved_rag_provenance(context)
             tp_identity = _approved_tp_identity(context)
         else:

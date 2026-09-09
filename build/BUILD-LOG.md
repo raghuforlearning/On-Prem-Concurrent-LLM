@@ -867,3 +867,33 @@ collection remains a parallel owner/data activity.
 - Complete page-by-page human visual approval, including distributor identity,
   split-table and final BOQ/commercial/acceptance review.
 - Do not release the previously reviewed unmasked Builder artifact.
+
+---
+
+**P1-19/P1-20 commercial-source hardening and genuine UAT — 09-Sep-2026**
+
+### Built
+
+- Generalized the approved costing-sheet contract so both CP and TP use
+  customer selling prices; vendor quote values remain upstream procurement
+  evidence only.
+- Added a fail-closed CP regression for missing approved customer commercials.
+- No Proposal Builder or Local LLM source/runtime configuration was changed.
+
+### Validation evidence
+
+| Test | Result |
+|---|---|
+| Baseline focused P1-19/P1-20 suite | **20 passed** |
+| Edited-source P1-19 suite | **23 passed, 4 expected live skips** |
+| Edited-source P1-20 suite | **11 passed** |
+| Rebuilt-image focused P1-19/P1-20 suite | **21 passed** |
+| Live CP build | **DONE**, customer total AED 1,567,365.88, artifact SHA-256 `a1276f3146ee6080ece651c556517626f8b1c769f70e308194881f34c39e6dc9` |
+| Live genuine-source TP build | **QUARANTINED**, all gates passed except `source_graphics_preserved` |
+
+The TP used the hash-pinned 60-page Verloop vendor PDF. The report recorded 52
+main-document drawings against 102 qualifying PDF image occurrences. A distinct
+stream and visual review showed repeated source objects, but also confirmed that
+meaningful source slides were omitted, including the indicative timeline,
+implementation-team responsibilities, support process and the full Flyin case
+study. The fidelity gate remains enforced and the TP must not be released.

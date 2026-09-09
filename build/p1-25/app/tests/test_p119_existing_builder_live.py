@@ -127,6 +127,35 @@ def _live_payload(proposal_type):
         "include_scope_of_work": False,
         "additional_notes": "Not for customer release.",
     }
+    if proposal_type in {"CP", "TP"}:
+        builder_context["customer_commercials"] = {
+            "currency": "AED",
+            "subtotal": "100.00",
+            "vat_rate": "5.00",
+            "vat_amount": "5.00",
+            "grand_total": "105.00",
+            "terms": {
+                "payment": "100% advance",
+                "validity": "30 days",
+                "delivery": "2 weeks",
+            },
+            "line_items": [
+                {
+                    "line_no": 1,
+                    "part_number": "UAT-ONLY",
+                    "description": "Synthetic Orchestrator adapter acceptance item",
+                    "quantity": "1",
+                    "unit_price": "100.00",
+                    "line_total": "100.00",
+                }
+            ],
+            "authority": {
+                "kind": "APPROVED_COSTING_SHEET",
+                "source_sha256": "c" * 64,
+                "approved_by": "finance.uat",
+                "approved_at": "2026-08-18T10:00:00+04:00",
+            },
+        }
     if proposal_type == "TP":
         builder_context.update(
             {
@@ -134,34 +163,6 @@ def _live_payload(proposal_type):
                 "client_real_name": "NationLabs Internal UAT",
                 "client_aliases": ["NationLabs Internal UAT"],
                 "mask_client": True,
-                "customer_commercials": {
-                    "currency": "AED",
-                    "subtotal": "100.00",
-                    "vat_rate": "5.00",
-                    "vat_amount": "5.00",
-                    "grand_total": "105.00",
-                    "terms": {
-                        "payment": "100% advance",
-                        "validity": "30 days",
-                        "delivery": "2 weeks",
-                    },
-                    "line_items": [
-                        {
-                            "line_no": 1,
-                            "part_number": "UAT-ONLY",
-                            "description": "Synthetic Orchestrator adapter acceptance item",
-                            "quantity": "1",
-                            "unit_price": "100.00",
-                            "line_total": "100.00",
-                        }
-                    ],
-                    "authority": {
-                        "kind": "APPROVED_COSTING_SHEET",
-                        "source_sha256": "c" * 64,
-                        "approved_by": "finance.uat",
-                        "approved_at": "2026-08-18T10:00:00+04:00",
-                    },
-                },
                 "rag_provenance": {
                     "status": "APPROVED",
                     "draft_id": 1,

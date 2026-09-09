@@ -256,13 +256,16 @@ P1-19 operations:
   fail-closed until a final SHA-256-tracked PDF also exists.
 
 P1-20 operations:
-- TP requires `context.proposal_builder.customer_commercials`. This is a
+- CP and TP require `context.proposal_builder.customer_commercials`. This is a
   customer-facing selling-price snapshot, separate from the selected vendor
   quote. It must contain currency, line items, subtotal, VAT rate, VAT amount,
   grand total, payment/validity/delivery terms and an `authority` object.
 - `authority.kind` must be `APPROVED_COSTING_SHEET`; source SHA-256,
   `approved_by` and `approved_at` are mandatory. Never place passwords or the
   costing workbook itself in the frozen JSON payload.
+- Never assemble a customer-facing CP/TP from the selected vendor quote alone.
+  The accepted quote remains procurement provenance; the approved costing-sheet
+  snapshot supplies the Builder BOQ and expected customer total.
 - only part number, description, quantity, unit price and line total are sent
   to the Builder. Internal cost, buy price, vendor cost, margin and markup
   fields are rejected.
