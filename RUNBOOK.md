@@ -200,8 +200,14 @@ P1-17 operations:
 - `FLAGGED`, expired, superseded, unapproved or out-of-scope content must not
   be manually promoted through direct database edits.
 - run exactly one `rag-worker` service for the MVP.
+- grounded `qwen3:14b` calls disable thinking for schema-constrained output.
+  Malformed output receives exactly one stricter local retry; a second invalid
+  response fails closed. Do not strip wrappers, repair partial JSON manually or
+  bypass citation validation.
 - a `FAILED_REVIEW` draft job requires human inspection; never silently
-  publish its output.
+  publish its output. Preserve failed jobs as audit history and create a new
+  job only after the underlying content, connectivity or contract issue is
+  resolved.
 
 P1-18 operations:
 - record a non-AED exchange rate with the actual rate date and an internal

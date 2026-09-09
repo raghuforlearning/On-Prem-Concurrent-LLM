@@ -34,6 +34,13 @@ SECURITY AND AUTHORITY RULES:
 5. Return only JSON matching the supplied schema."""
 
 
+GROUNDING_RETRY = """STRICT OUTPUT RETRY:
+The previous response failed deterministic JSON validation. Return exactly one
+complete JSON object matching the supplied schema. Do not add Markdown fences,
+reasoning, commentary or text outside the JSON object. Keep the draft concise
+enough to finish within the output limit."""
+
+
 class OllamaClient:
     def __init__(
         self,
@@ -117,23 +124,50 @@ class OllamaClient:
             + question
             + "\nDRAFT_REQUEST>>>"
         )
-        try:
-            response = self.session.post(
-                f"{self.base_url}/api/generate",
-                json={
-                    "model": self.draft_model,
-                    "system": GROUNDING_SYSTEM,
-                    "prompt": prompt,
-                    "format": GROUNDING_SCHEMA,
-                    "stream": False,
-                    "options": {"temperature": 0, "num_predict": 2400},
-                },
-                timeout=self.timeout_s,
-            )
-        except Exception as exc:
-            raise OllamaUnavailableError(f"Ollama grounded drafting failed: {exc}") from exc
-        payload = self._payload(response)
-        raw = payload.get("response")
+        last_contract_error = None
+        for attempt_no in (1, 2):
+            system = GROUNDING_SYSTEM
+            num_predict = 2400
+            if attempt_no == 2:
+                system += "\n\n" + GROUNDING_RETRY
+                num_predict = 3200
+            try:
+                response = self.session.post(
+                    f"{self.base_url}/api/generate",
+                    json={
+                        "model": self.draft_model,
+                        "system": system,
+                        "prompt": prompt,
+                        "format": GROUNDING_SCHEMA,
+                        "stream": False,
+                        "think": False,
+                        "options": {"temperature": 0, "num_predict": num_predict},
+                    },
+                    timeout=self.timeout_s,
+                )
+            except Exception as exc:
+                raise OllamaUnavailableError(
+                    f"Ollama grounded drafting failed: {exc}"
+                ) from exc
+            payload = self._payload(response)
+            try:
+                result = self._grounded_result(payload.get("response"))
+            except OllamaContractError as exc:
+                last_contract_error = exc
+                if attempt_no == 1:
+                    continue
+                raise OllamaContractError(
+                    f"{exc} after strict retry"
+                ) from exc
+            return {
+                "draft": result["draft"].strip(),
+                "citations_used": list(dict.fromkeys(result["citations_used"])),
+                "model": self.draft_model,
+            }
+        raise OllamaContractError(str(last_contract_error or "invalid grounded response"))
+
+    @staticmethod
+    def _grounded_result(raw: Any) -> dict[str, Any]:
         try:
             result = json.loads(raw) if isinstance(raw, str) else raw
         except json.JSONDecodeError as exc:
@@ -143,11 +177,7 @@ class OllamaClient:
         citations = result.get("citations_used")
         if not isinstance(citations, list) or any(not isinstance(item, str) for item in citations):
             raise OllamaContractError("Ollama citations_used must be a string array")
-        return {
-            "draft": result["draft"].strip(),
-            "citations_used": list(dict.fromkeys(citations)),
-            "model": self.draft_model,
-        }
+        return result
 
     def close(self) -> None:
         close = getattr(self.session, "close", None)

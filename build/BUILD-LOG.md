@@ -5,6 +5,32 @@ Rules: one backlog item at a time · acceptance test must pass before next item 
 
 ---
 
+## P1-17 - Grounded JSON reliability fix - PASSED (09-Sep-2026)
+
+- Reproduced live UAT Job 3 failing closed because the Qwen response was not
+  valid JSON after approved-content retrieval had succeeded.
+- Updated only the Orchestrator Ollama adapter: schema-constrained drafting now
+  sends `think=false` and performs exactly one stricter retry after a malformed
+  or contract-invalid response.
+- The retry remains fail-closed: Markdown wrappers and partial JSON are not
+  stripped or repaired, and two invalid responses still raise an adapter
+  contract error for `FAILED_REVIEW` handling.
+- Added regressions for thinking suppression, one-retry recovery and failure
+  after two invalid responses.
+- Focused P1-17 tests: **11 passed**.
+- Opt-in live `bge-m3` / `qwen3:14b` adapter test: **1 passed**.
+- Complete rebuilt-image suite against disposable PostgreSQL 16/pgvector with
+  the P1-02 audit schema: **112 passed, 2 expected live skips**.
+- Rebuilt and redeployed only `nl-api` and `rag-worker`; health returned `ok`
+  with PostgreSQL and four Ollama models reachable.
+- Live UAT Job 4 completed as Draft 1 / Retrieval 4 with five citations, all
+  persisted against approved GSPC Document 2. Earlier failed jobs remain intact
+  as audit evidence.
+- No Local LLM Platform or Proposal Builder source/runtime configuration was
+  changed.
+
+---
+
 ## P1-13 - Clarification Set-button regression fix - PASSED (08-Sep-2026)
 
 - Corrected the review-board clarification handler to use literal DOM element

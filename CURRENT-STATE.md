@@ -39,6 +39,15 @@ clarification Set-button regression for dotted field paths was corrected and
 deployed to local Docker UAT. A live clarification persisted successfully and
 the active suite passed 93 tests with 19 expected opt-in/live skips.
 
+Operational validation update (09-Sep-2026): the P1-17 grounded-drafting
+adapter was hardened after a live `qwen3:14b` response failed strict JSON
+validation. Structured drafting now disables model thinking and performs
+exactly one stricter schema retry while continuing to reject wrappers,
+incomplete JSON and invalid contracts. The rebuilt-image suite passed 112 tests
+with 2 expected live skips, the opt-in live Ollama adapter test passed, and UAT
+Job 4 completed as Draft 1 with five persisted citations to approved GSPC
+Document 2. Jobs 1-3 remain preserved as failure/audit history.
+
 ## Product boundary
 
 There are three separate systems:

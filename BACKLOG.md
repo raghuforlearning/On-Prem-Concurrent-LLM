@@ -197,6 +197,12 @@ Validation evidence:
   (1,024 dimensions) and `qwen3:14b` grounded-output contract tests.
 - Compose and image-secret exclusion checks passed; frozen systems were not
   modified by the Orchestrator implementation.
+- 09-Sep-2026 live-UAT hardening: grounded generation now sends `think=false`
+  and performs exactly one strict schema retry after malformed output. It does
+  not strip Markdown fences or accept partial JSON. Focused tests passed 11/11,
+  the opt-in live Ollama test passed, the complete rebuilt-image suite passed
+  112 tests with 2 expected skips, and UAT Job 4 completed with five persisted
+  approved-content citations.
 
 Build:
 - pgvector-backed local RAG,
